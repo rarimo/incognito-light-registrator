@@ -1,4 +1,4 @@
-package types
+package resources
 
 import "encoding/asn1"
 
