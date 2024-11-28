@@ -1,0 +1,36 @@
+allOf:
+  - $ref: '#/components/schemas/DocumentSodKey'
+  - type: object
+    required:
+      - attributes
+    properties:
+      attributes:
+        type: object
+        required:
+          - hash_algorithm
+          - signature_algorithm
+          - signed_attributes
+          - signature
+          - encapsulated_content
+          - pem_file
+        properties:
+          hash_algorithm:
+            type: string
+            description: The hash algorithm used to hash the content
+          signature_algorithm:
+            type: string
+            description: The signature algorithm used to sign the content
+          signed_attributes:
+            type: string
+            description: The signed attributes, for e.g. 104 bytes-long hex string
+          signature:
+            type: string
+            description: Signature corresponding to the algorithm
+          encapsulated_content:
+            type: string
+            description: The encapsulated content, for e.g. 186 bytes-long hex string
+          pem_file:
+            type: string
+            description: The PEM file containing the public key
+
+

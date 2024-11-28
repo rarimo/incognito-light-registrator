@@ -1,11 +1,3 @@
-vault:
-  address: "http://127.0.0.1:8200"
-  mount_path: "secret_data"
-
-network:
-  eth_rpc:
-  state_contract:
-
 verifier:
   verification_keys_paths:
     sha1: "./sha1_verification_key.json"
@@ -16,18 +8,12 @@ verifier:
   multi_acc_max_limit: 30
   registration_timeout: 1h
 
-issuer:
-  base_url: "http://localhost:3002/v1"
-  did: ""
-  claim_type: "VotingCredential"
-  credential_schema: "https://bafybeibbniic63etdbcn5rs5ir5bhelym6ogv46afj35keatzhn2eqnioi.ipfs.w3s.link/VotingCredential.json"
-
 log:
   level: debug
   disable_sentry: true
 
 db:
-  url: postgres://voting:voting@localhost:35432/voting?sslmode=disable
+  url: postgres://ilr:ilr@localhost:5432/ilr?sslmode=disable
 
 listener:
   addr: :8000

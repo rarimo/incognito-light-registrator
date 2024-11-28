@@ -1,0 +1,15 @@
+allOf:
+  - $ref: '#/components/schemas/VerifySodKey'
+  - type: object
+    required:
+      - attributes
+    properties:
+      attributes:
+        type: object
+        properties:
+          dg1:
+            type: string
+            example: 7768792064696420796F75206576656E206465636F6465642069743F
+            description: The data group 1 of the SOD
+
+
