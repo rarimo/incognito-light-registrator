@@ -33,14 +33,11 @@ func VerifySod(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	algorithm, ok := types.SupportedSignatureAlgorithms[req.Data.Attributes.HashAlgorithm+"with"+req.Data.Attributes.SignatureAlgorithm]
-	if !ok {
-		api.Log(r).Error("unsupported signature algorithm")
-		ape.RenderErr(w, problems.BadRequest(validation.Errors{
-			"/data/attributes/signature_algorithm": errors.New("unsupported signature algorithm"),
-		})...)
-		return
-	}
+	// algorithm pair already validated in NewVerifySodRequest
+	algorithm, _ := types.SupportedSignatureHashAlgorithms[types.CompositeKey{
+		HashAlgo:      req.Data.Attributes.HashAlgorithm,
+		SignatureAlgo: req.Data.Attributes.SignatureAlgorithm,
+	}]
 
 	rawReqData, err := json.Marshal(req.Data)
 	if err != nil {
@@ -52,8 +49,6 @@ func VerifySod(w http.ResponseWriter, r *http.Request) {
 		"user-agent":   r.Header.Get("User-Agent"),
 		"request_data": string(rawReqData),
 	})
-
-	log.Debug("created identity request")
 
 	signedAttributes, err := hex.DecodeString(req.Data.Attributes.SignedAttributes)
 	if err != nil {
@@ -151,7 +146,11 @@ func parseCertificate(pemFile []byte) (*x509.Certificate, error) {
 	return cert, nil
 }
 
-func validateSignedAttributes(signedAttributes, encapsulatedContent []byte, algorithm types.SignatureAlgorithm) error {
+func validateSignedAttributes(
+		signedAttributes,
+		encapsulatedContent []byte,
+		algorithm types.SignatureHashAlgorithm,
+) error {
 	signedAttributesASN1 := make([]asn1.RawValue, 0)
 
 	if _, err := asn1.UnmarshalWithParams(signedAttributes, &signedAttributesASN1, "set"); err != nil {
@@ -185,7 +184,12 @@ func validateSignedAttributes(signedAttributes, encapsulatedContent []byte, algo
 	return nil
 }
 
-func verifySignature(req resources.DocumentSodResponse, cert *x509.Certificate, signedAttributes []byte, algorithm types.SignatureAlgorithm) error {
+func verifySignature(
+		req resources.DocumentSodResponse,
+		cert *x509.Certificate,
+		signedAttributes []byte,
+		algorithm types.SignatureHashAlgorithm,
+) error {
 	signature, err := hex.DecodeString(req.Data.Attributes.Signature)
 	if err != nil {
 		return errors.Wrap(err, "failed to decode hex string")
@@ -214,7 +218,7 @@ func validateCert(cert *x509.Certificate, masterCertsPem []byte) error {
 	}
 
 	if len(foundCerts) == 0 {
-		return fmt.Errorf("invalid certificate: no valid certificate found")
+		return errors.New("invalid certificate: no valid certificate found")
 	}
 
 	return nil
