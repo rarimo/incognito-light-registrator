@@ -22,19 +22,27 @@ func NewVerifySodRequest(r *http.Request) (request resources.DocumentSodResponse
 }
 
 func validateVerifySod(r resources.DocumentSodResponse) error {
-	key := types.CompositeKey{
-		HashAlgo:      r.Data.Attributes.HashAlgorithm,
-		SignatureAlgo: r.Data.Attributes.SignatureAlgorithm,
-	}
-
-	if _, ok := types.SupportedSignatureHashAlgorithms[key]; ok {
-		return nil
-	}
-
 	return validation.Errors{
-		"/data/attributes": types.UnsupportedAlgorithmPairError{
-			HashAlgo:      r.Data.Attributes.HashAlgorithm,
-			SignatureAlgo: r.Data.Attributes.SignatureAlgorithm,
-		},
+		"/data/attributes/signature": validation.Validate(
+			r.Data.Attributes.SignatureAlgorithm,
+			validation.By(func(value interface{}) error {
+				_, ok := types.IsValidSignatureAlgorithm(value.(string))
+				if !ok {
+					return errors.New("unsupported signature algorithm")
+				}
+
+				return nil
+			}),
+		),
+		"/data/attributes/algorithm": validation.Validate(
+			r.Data.Attributes.HashAlgorithm,
+			validation.By(func(value interface{}) error {
+				_, ok := types.IsValidHashAlgorithm(value.(string))
+				if !ok {
+					return errors.New("unsupported hash algorithm")
+				}
+
+				return nil
+			})),
 	}.Filter()
 }
