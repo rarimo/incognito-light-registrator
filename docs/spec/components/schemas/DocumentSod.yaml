@@ -13,6 +13,7 @@ allOf:
           - signature
           - encapsulated_content
           - pem_file
+          - dg15
         properties:
           hash_algorithm:
             type: string
@@ -32,5 +33,9 @@ allOf:
           pem_file:
             type: string
             description: The PEM file containing the public key
+          dg15:
+            type: string
+            description: The Data Group 15, hex string
+
 
 

@@ -6,12 +6,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
-	errors2 "errors"
 	"fmt"
 	"net/http"
 
+	errors2 "github.com/pkg/errors"
+
 	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/google/jsonapi"
 	"github.com/rarimo/certificate-transparency-go/x509"
+	"github.com/rarimo/passport-identity-provider/internal/data"
 	"github.com/rarimo/passport-identity-provider/internal/service/api"
 	"github.com/rarimo/passport-identity-provider/internal/service/api/requests"
 	"github.com/rarimo/passport-identity-provider/internal/types"
@@ -22,7 +25,7 @@ import (
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
-func VerifySod(w http.ResponseWriter, r *http.Request) {
+func VerifySodWrapper(w http.ResponseWriter, r *http.Request) {
 	req, err := requests.NewVerifySodRequest(r)
 	if err != nil {
 		api.Log(r).WithError(err).Error("failed to create new create identity request")
@@ -31,8 +34,8 @@ func VerifySod(w http.ResponseWriter, r *http.Request) {
 	}
 
 	algorithm := types.CompositeAlgorithmKey{
-		HashAlgorithm:      req.Data.Attributes.HashAlgorithm,
-		SignatureAlgorithm: req.Data.Attributes.SignatureAlgorithm,
+		HashAlgorithm:      types.HashAlgorithmFromString(req.Data.Attributes.HashAlgorithm),
+		SignatureAlgorithm: types.SignatureAlgorithmFromString(req.Data.Attributes.SignatureAlgorithm),
 	}
 
 	rawReqData, err := json.Marshal(req.Data)
@@ -46,36 +49,86 @@ func VerifySod(w http.ResponseWriter, r *http.Request) {
 		"request_data": string(rawReqData),
 	})
 
+	cfg := api.VerifierConfig(r)
+
+	documentSOD := data.DocumentSOD{
+		DG15:                req.Data.Attributes.Dg15,
+		HashAlgorigthm:      algorithm.HashAlgorithm,
+		SignatureAlgorithm:  algorithm.SignatureAlgorithm,
+		SignedAttributed:    req.Data.Attributes.SignedAttributes,
+		EncapsulatedContent: req.Data.Attributes.EncapsulatedContent,
+		Signature:           req.Data.Attributes.Signature,
+		PemFile:             req.Data.Attributes.PemFile,
+		ErrorKind:           nil,
+		Error:               nil,
+	}
+
+	errKind, errResp, err := verifySod(req, algorithm, cfg.MasterCerts)
+	if errResp != nil {
+		log.WithError(err).Error("failed to verify SOD")
+	}
+
+	if errKind != nil {
+		errStr := ""
+		if err != nil {
+			errStr = err.Error()
+		}
+
+		documentSOD.ErrorKind = errKind
+		documentSOD.Error = &errStr
+	}
+
+	if _, err := api.DocumentSODQ(r).Insert(documentSOD); err != nil {
+		log.WithError(err).Error("failed to insert document SOD")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
+
+	if errResp == nil {
+		ape.Render(w, resources.VerifySodResponse{
+			Data: resources.VerifySod{
+				Key: resources.NewKeyInt64(0, resources.VERIFY_SOD),
+				Attributes: resources.VerifySodAttributes{
+					Dg1: nil,
+				},
+			},
+		})
+
+		return
+	}
+
+	ape.RenderErr(w, errResp...)
+}
+
+func verifySod(
+		req resources.DocumentSodResponse,
+		algorithm types.CompositeAlgorithmKey,
+		masterCertsPem []byte,
+) (*data.DocumentSODErrorKind, []*jsonapi.ErrorObject, error) {
 	signedAttributes, err := hex.DecodeString(req.Data.Attributes.SignedAttributes)
 	if err != nil {
-		log.WithError(err).Error("failed to decode hex string")
-		ape.RenderErr(w, problems.BadRequest(err)...)
-		return
+		return nil, problems.BadRequest(err), errors.Wrap(err, "failed to decode hex string")
 	}
 
 	encapsulatedContent, err := hex.DecodeString(req.Data.Attributes.EncapsulatedContent)
 	if err != nil {
-		log.WithError(err).Error("failed to decode hex string")
-		ape.RenderErr(w, problems.BadRequest(err)...)
-		return
+		return nil, problems.BadRequest(err), errors.Wrap(err, "failed to decode hex string")
 	}
 
 	if err := validateSignedAttributes(signedAttributes, encapsulatedContent, algorithm); err != nil {
-		log.WithError(err).Error("failed to validate signed attributes")
-		ape.RenderErr(w, problems.InternalError())
-		return
+		return data.SAValidateErr.Ptr(),
+			problems.BadRequest(err),
+			errors.Wrap(err, "failed to validate signed attributes")
 	}
 
 	cert, err := parseCertificate([]byte(req.Data.Attributes.PemFile))
 	if err != nil {
-		log.WithError(err).Error("failed to parse certificate")
-		ape.RenderErr(w, problems.InternalError())
-		return
+		return data.PEMFileParseErr.Ptr(),
+			problems.BadRequest(err),
+			errors.Wrap(err, "failed to parse certificate")
 	}
 
 	if err := verifySignature(req, cert, signedAttributes, algorithm); err != nil {
-		log.WithError(err).Error("failed to verify signature")
-
 		validationError := validation.Errors{
 			"/data/attributes/signature": err,
 		}
@@ -86,68 +139,53 @@ func VerifySod(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		ape.RenderErr(w, problems.BadRequest(validationError)...)
-		return
+		return data.SigVerifyErr.Ptr(),
+			problems.BadRequest(validationError),
+			errors.Wrap(err, "failed to verify signature")
 	}
-
-	cfg := api.VerifierConfig(r)
 
 	encapsulatedData := types.EncapsulatedData{}
 	if _, err = asn1.Unmarshal(encapsulatedContent, &encapsulatedData); err != nil {
-		log.WithError(err).Error("failed to unmarshal ASN.1")
-		ape.RenderErr(w, problems.InternalError())
-		return
+		return nil, problems.BadRequest(err), errors.Wrap(err, "failed to unmarshal encapsulated data")
 	}
 
 	privateKey := make([]asn1.RawValue, 0)
 	if _, err = asn1.Unmarshal(encapsulatedData.PrivateKey.FullBytes, &privateKey); err != nil {
-		log.WithError(err).Error("failed to unmarshal ASN.1")
-		ape.RenderErr(w, problems.InternalError())
-		return
+		return nil, problems.BadRequest(err), errors.Wrap(err, "failed to unmarshal encapsulated data private key")
 	}
 
 	privKeyEl := types.PrivateKeyElement{}
 	if _, err = asn1.Unmarshal(privateKey[0].FullBytes, &privKeyEl); err != nil {
-		log.WithError(err).Error("failed to unmarshal ASN.1")
-		ape.RenderErr(w, problems.InternalError())
-		return
+		return nil, problems.BadRequest(err), errors.Wrap(err, "failed to unmarshal private key element")
 	}
 
-	if err := validateCert(cert, cfg.MasterCerts); err != nil {
-		log.WithError(err).Error("failed to validate certificate")
-		ape.RenderErr(w, problems.BadRequest(err)...)
-		return
+	if err := validateCert(cert, masterCertsPem); err != nil {
+		return data.PEMFileValidateErr.Ptr(),
+			problems.BadRequest(err),
+			errors.Wrap(err, "failed to validate certificate")
 	}
 
-	dg1Hex := hex.EncodeToString(privKeyEl.OctetStr.Bytes)
-	ape.Render(w, resources.VerifySodResponse{
-		Data: resources.VerifySod{
-			Key: resources.NewKeyInt64(0, resources.VERIFY_SOD),
-			Attributes: resources.VerifySodAttributes{
-				Dg1: &dg1Hex,
-			},
-		},
-	})
+	return nil, nil, nil
 }
 
 func parseCertificate(pemFile []byte) (*x509.Certificate, error) {
 	block, _ := pem.Decode(pemFile)
 	if block == nil {
-		return nil, errors.New("invalid certificate: invalid PEM")
+		return nil, errors.New("failed to decode PEM block")
 	}
 
 	cert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse certificate")
+		return nil, err
 	}
 
 	return cert, nil
 }
 
 func validateSignedAttributes(
-	signedAttributes,
-	encapsulatedContent []byte,
-	algorithm types.CompositeAlgorithmKey,
+		signedAttributes,
+		encapsulatedContent []byte,
+		algorithm types.CompositeAlgorithmKey,
 ) error {
 	signedAttributesASN1 := make([]asn1.RawValue, 0)
 
@@ -174,7 +212,7 @@ func validateSignedAttributes(
 
 	if !bytes.Equal(digestAttr.Digest[0].Bytes, d) {
 		return errors.From(
-			errors.New("digest signed attribute is not equal to encapsulated content hash"), logan.F{
+			errors.New("signed attributes digest values are not equal"), logan.F{
 				"signed_attributes":    hex.EncodeToString(digestAttr.Digest[0].Bytes),
 				"content_hash":         hex.EncodeToString(d),
 				"encapsulated_content": hex.EncodeToString(encapsulatedContent),
@@ -185,10 +223,10 @@ func validateSignedAttributes(
 }
 
 func verifySignature(
-	req resources.DocumentSodResponse,
-	cert *x509.Certificate,
-	signedAttributes []byte,
-	algorithm types.CompositeAlgorithmKey,
+		req resources.DocumentSodResponse,
+		cert *x509.Certificate,
+		signedAttributes []byte,
+		algorithm types.CompositeAlgorithmKey,
 ) error {
 	signature, err := hex.DecodeString(req.Data.Attributes.Signature)
 	if err != nil {
@@ -211,7 +249,9 @@ func validateCert(cert *x509.Certificate, masterCertsPem []byte) error {
 	roots.AppendCertsFromPEM(masterCertsPem)
 
 	foundCerts, err := cert.Verify(x509.VerifyOptions{
-		Roots: roots,
+		Roots:             roots,
+		DisableTimeChecks: true,
+		DisableNameChecks: true,
 	})
 	if err != nil {
 		return fmt.Errorf("invalid certificate: %w", err)

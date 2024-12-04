@@ -31,6 +31,14 @@ func (h HashAlgorithm) String() string {
 	}
 }
 
+func HashAlgorithmFromString(alg string) HashAlgorithm {
+	h, ok := hashAlgorithmMap[alg]
+	if !ok {
+		return HashAlgorithm(0)
+	}
+	return h
+}
+
 func IsValidHashAlgorithm(alg string) (HashAlgorithm, bool) {
 	h, ok := hashAlgorithmMap[alg]
 	return h, ok
@@ -42,12 +50,14 @@ const (
 	RSA SignatureAlgorithm = iota
 	RSAPSS
 	ECDSA
+	Brainpool
 )
 
 var signatureAlgorithmMap = map[string]SignatureAlgorithm{
-	"RSA":     RSA,
-	"RSA-PSS": RSAPSS,
-	"ECDSA":   ECDSA,
+	"RSA":       RSA,
+	"RSA-PSS":   RSAPSS,
+	"ECDSA":     ECDSA,
+	"Brainpool": Brainpool,
 }
 
 func (s SignatureAlgorithm) String() string {
@@ -58,9 +68,19 @@ func (s SignatureAlgorithm) String() string {
 		return "RSA-PSS"
 	case ECDSA:
 		return "ECDSA"
+	case Brainpool:
+		return "Brainpool"
 	default:
 		return "Unknown"
 	}
+}
+
+func SignatureAlgorithmFromString(alg string) SignatureAlgorithm {
+	s, ok := signatureAlgorithmMap[alg]
+	if !ok {
+		return SignatureAlgorithm(0)
+	}
+	return s
 }
 
 func IsValidSignatureAlgorithm(alg string) (SignatureAlgorithm, bool) {
