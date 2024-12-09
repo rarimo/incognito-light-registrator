@@ -17,7 +17,7 @@ import (
 
 type VaultConfiger interface {
 	VaultConfig() *VaultConfig
-	ClientSignerCredentialsConfig() *ClientSignerCredentialsConfig
+	ClientKeysCredentialsConfig() *ClientKeysCredentialsConfig
 }
 
 type VaultConfig struct {
@@ -26,7 +26,7 @@ type VaultConfig struct {
 	SecretPath     string `json:"VAULT_SECRET_PATH"`
 }
 
-type ClientSignerCredentialsConfig struct {
+type ClientKeysCredentialsConfig struct {
 	SignatureKey *ecdsa.PrivateKey `fig:"signature_key,required"`
 }
 
@@ -66,11 +66,11 @@ func (c *vaultConfig) isEmptyOrIncomplete() bool {
 	return c.VaultConfig().MountPath == "" || c.VaultConfig().SecretPath == ""
 }
 
-func (c *vaultConfig) ClientSignerCredentialsConfig() *ClientSignerCredentialsConfig {
+func (c *vaultConfig) ClientKeysCredentialsConfig() *ClientKeysCredentialsConfig {
 	if c.isEmptyOrIncomplete() {
 		return nil //fallback to yaml config follows
 	}
-	config := new(ClientSignerCredentialsConfig)
+	config := new(ClientKeysCredentialsConfig)
 
 	err := c.getVaultSecret(c.VaultConfig().SecretPath, config)
 	if err != nil {

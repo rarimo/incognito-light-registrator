@@ -15,7 +15,7 @@ const (
 	logCtxKey ctxKey = iota
 	verifierConfigKey
 	documentSODQKey
-	signerConfigKey
+	keysConfigKey
 )
 
 func CtxLog(entry *logan.Entry) func(context.Context) context.Context {
@@ -48,12 +48,12 @@ func DocumentSODQ(r *http.Request) data.DocumentSODQ {
 	return r.Context().Value(documentSODQKey).(data.DocumentSODQ).New()
 }
 
-func CtxSignerConfig(entry config.SignerConfig) func(context.Context) context.Context {
+func CtxKeysConfig(entry config.KeysConfig) func(context.Context) context.Context {
 	return func(ctx context.Context) context.Context {
-		return context.WithValue(ctx, signerConfigKey, entry)
+		return context.WithValue(ctx, keysConfigKey, entry)
 	}
 }
 
-func SignerConfig(r *http.Request) *config.SignerConfig {
-	return r.Context().Value(signerConfigKey).(*config.SignerConfig)
+func KeysConfig(r *http.Request) config.KeysConfig {
+	return r.Context().Value(keysConfigKey).(config.KeysConfig)
 }

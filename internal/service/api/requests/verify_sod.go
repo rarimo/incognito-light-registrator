@@ -10,16 +10,16 @@ import (
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
-func NewVerifySodRequest(r *http.Request) (request resources.DocumentSodResponse, err error) {
+func NewRegisterRequest(r *http.Request) (request resources.DocumentSodResponse, err error) {
 	err = json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
 		return request, validation.NewError("err_decode", "failed to unmarshal verify sod request")
 	}
 
-	return request, validateVerifySod(request)
+	return request, validateRegister(request)
 }
 
-func validateVerifySod(r resources.DocumentSodResponse) error {
+func validateRegister(r resources.DocumentSodResponse) error {
 	return validation.Errors{
 		"/data/attributes/signature_algorithm": validation.Validate(
 			r.Data.Attributes.SignatureAlgorithm,

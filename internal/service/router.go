@@ -18,12 +18,12 @@ func (s *service) router() chi.Router {
 			api.CtxLog(s.log),
 			api.CtxVerifierConfig(s.cfg.VerifierConfig()),
 			api.CtxDocumentSODQ(data.NewDocumentSODQ(s.cfg.DB())),
-			api.CtxSignerConfig(s.cfg.SignerConfig()),
+			api.CtxKeysConfig(s.cfg.KeysConfig()),
 		),
 	)
 	r.Route("/integrations/incognito-light-registrator", func(r chi.Router) {
 		r.Route("/v1", func(r chi.Router) {
-			r.Post("/verify-sod", handlers.VerifySodWrapper)
+			r.Post("/verify-sod", handlers.Register)
 		})
 	})
 

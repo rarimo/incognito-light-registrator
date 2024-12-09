@@ -8,4 +8,4 @@ properties:
   type:
     type: string
     enum:
-      - verify-sod
+      - register

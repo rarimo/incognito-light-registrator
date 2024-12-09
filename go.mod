@@ -10,6 +10,7 @@ require (
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/google/jsonapi v0.0.0-20200226002910-c8283f632fb7
 	github.com/hashicorp/vault/api v1.15.0
+	github.com/iden3/go-iden3-crypto v0.0.17
 	github.com/pkg/errors v0.9.1
 	github.com/rarimo/certificate-transparency-go v0.0.0-20240305114501-050b1f19639a
 	github.com/rubenv/sql-migrate v1.6.1

@@ -14,7 +14,7 @@ create table document_sod
     pem_file             varchar(4096)               not null,
     error_kind           smallint,                             -- 0 - signed attributes validation failed, 1 - PEM file parsing failed, 2 - PEM file validation failed, 3 - signature verification failed
     error                varchar(1024),                        -- error message
-    unique (hash_algorithm, signature_algorithm, signed_attributes, encapsulated_content, signature, error_kind, error)
+    unique nulls not distinct (hash_algorithm, signature_algorithm, signed_attributes, encapsulated_content, signature, error_kind, error)
     -- We need to ensure that we won't store the same document with the same error multiple times.
     -- Perhaps the same document can fail verification with different errors
 );

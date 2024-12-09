@@ -15,7 +15,7 @@ type Config interface {
 	comfig.Listenerer
 
 	VerifierConfiger
-	SignerConfiger
+	KeysConfiger
 }
 
 type config struct {
@@ -26,7 +26,7 @@ type config struct {
 	getter kv.Getter
 
 	VerifierConfiger
-	SignerConfiger
+	KeysConfiger
 }
 
 func New(getter kv.Getter) Config {
@@ -37,6 +37,6 @@ func New(getter kv.Getter) Config {
 		Listenerer:       comfig.NewListenerer(getter),
 		Logger:           comfig.NewLogger(getter, comfig.LoggerOpts{}),
 		VerifierConfiger: NewVerifierConfiger(getter),
-		SignerConfiger:   NewSignerConfiger(getter),
+		KeysConfiger:     NewKeysConfiger(getter),
 	}
 }

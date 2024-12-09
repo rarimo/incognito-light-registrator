@@ -18,13 +18,13 @@ func (e ErrInvalidPublicKey) Error() string {
 	return "invalid public key type for " + e.Expected.String()
 }
 
-// CompositeAlgorithmKey defines a hash and signature algorithm combination.
-type CompositeAlgorithmKey struct {
+// AlgorithmPair defines a hash and signature algorithm combination.
+type AlgorithmPair struct {
 	HashAlgorithm
 	SignatureAlgorithm
 }
 
-func GeneralVerify(publicKey interface{}, hash []byte, signature []byte, algo CompositeAlgorithmKey) error {
+func GeneralVerify(publicKey interface{}, hash []byte, signature []byte, algo AlgorithmPair) error {
 	switch algo.SignatureAlgorithm {
 	case RSA:
 		rsaKey, ok := publicKey.(*rsa.PublicKey)

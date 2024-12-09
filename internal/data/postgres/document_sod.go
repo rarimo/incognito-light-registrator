@@ -64,8 +64,7 @@ func (q *DocumentSODQ) Insert(value data.DocumentSOD) (*data.DocumentSOD, error)
 	var result data.DocumentSOD
 	clauses := structs.Map(value)
 	stmt := sq.Insert(documentSODTableName).SetMap(clauses).Suffix(
-		"on conflict (hash_algorithm, signature_algorithm, signed_attributes, encapsulated_content, " +
-			"signature, error_kind, error) do nothing returning *",
+		"on conflict (hash_algorithm, signature_algorithm, signed_attributes, encapsulated_content, signature, error_kind, error) do update set updated_at = current_timestamp returning *",
 	)
 	err := q.db.Get(&result, stmt)
 	if errors.Is(err, sql.ErrNoRows) {

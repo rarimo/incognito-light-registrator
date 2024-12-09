@@ -1,8 +1,8 @@
 post:
   tags:
-    - Verify document SOD
-  summary: Verify document SOD
-  operationId: verifyDocumentSod
+    - Register
+  summary: Register
+  operationId: register
   requestBody:
     content:
       application/json:
@@ -24,7 +24,7 @@ post:
             properties:
               data:
                 type: object
-                $ref: '#/components/schemas/VerifySod'
+                $ref: '#/components/schemas/Register'
     '500':
       description: Internal Error
       content:
