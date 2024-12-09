@@ -62,7 +62,9 @@ func Register(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		ape.Render(w, response)
+		if response != nil {
+			ape.Render(w, response)
+		}
 	}(&documentSOD, &response)
 
 	rawReqData, err := json.Marshal(req.Data)
@@ -172,12 +174,12 @@ func Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func verifySod(
-	signedAttributes []byte,
-	encapsulatedContent []byte,
-	signature []byte,
-	cert *x509.Certificate,
-	algorithmPair types.AlgorithmPair,
-	masterCertsPem []byte,
+		signedAttributes []byte,
+		encapsulatedContent []byte,
+		signature []byte,
+		cert *x509.Certificate,
+		algorithmPair types.AlgorithmPair,
+		masterCertsPem []byte,
 ) error {
 	if err := validateSignedAttributes(signedAttributes, encapsulatedContent, algorithmPair.HashAlgorithm); err != nil {
 		return &types.SodError{
@@ -226,9 +228,9 @@ func parseCertificate(pemFile []byte) (*x509.Certificate, error) {
 }
 
 func validateSignedAttributes(
-	signedAttributes,
-	encapsulatedContent []byte,
-	hashAlgorithm types.HashAlgorithm,
+		signedAttributes,
+		encapsulatedContent []byte,
+		hashAlgorithm types.HashAlgorithm,
 ) error {
 	signedAttributesASN1 := make([]asn1.RawValue, 0)
 
@@ -266,10 +268,10 @@ func validateSignedAttributes(
 }
 
 func verifySignature(
-	signature []byte,
-	cert *x509.Certificate,
-	signedAttributes []byte,
-	algorithmPair types.AlgorithmPair,
+		signature []byte,
+		cert *x509.Certificate,
+		signedAttributes []byte,
+		algorithmPair types.AlgorithmPair,
 ) error {
 	h := types.GeneralHash(algorithmPair.HashAlgorithm)
 	h.Write(signedAttributes)
