@@ -1,14 +1,19 @@
-get:
+post:
   tags:
-    - GIST
-  summary: The GIST data retrieving
-  operationId: gist-data
-  parameters:
-    - in: query
-      name: user_did
-      required: true
-      schema:
-        type: string
+    - Register
+  summary: Register
+  operationId: register
+  requestBody:
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+            - data
+          properties:
+            data:
+              type: object
+              $ref: '#/components/schemas/DocumentSod'
   responses:
     '200':
       description: Success
@@ -19,7 +24,7 @@ get:
             properties:
               data:
                 type: object
-                $ref: '#/components/schemas/GistData'
+                $ref: '#/components/schemas/Register'
     '500':
       description: Internal Error
       content:
