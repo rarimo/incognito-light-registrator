@@ -183,16 +183,14 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		// Since circuit is using 31 bits of dg1, we need to truncate it to last 31 bytes
 		dg1Truncated = dg1[len(dg1)-31:]
 	}
-	_ = dg1Truncated
-	_ = proofDg1Decimal
 
-	//if !bytes.Equal(dg1Truncated, proofDg1Decimal.Bytes()) {
-	//	log.Error("proof contains foreign data group 1")
-	//	jsonError = problems.BadRequest(validation.Errors{
-	//		"zk_proof": errors.New("proof contains foreign data group 1"),
-	//	})
-	//	return
-	//}
+	if !bytes.Equal(dg1Truncated, proofDg1Decimal.Bytes()) {
+		log.Error("proof contains foreign data group 1")
+		jsonError = problems.BadRequest(validation.Errors{
+			"zk_proof": errors.New("proof contains foreign data group 1"),
+		})
+		return
+	}
 
 	err = verifySod(signedAttributes, encapsulatedContent, slaveSignature.Bytes, cert, algorithmPair, cfg)
 	if err != nil {
@@ -245,12 +243,12 @@ func Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func verifySod(
-	signedAttributes []byte,
-	encapsulatedContent []byte,
-	signature []byte,
-	cert *x509.Certificate,
-	algorithmPair types.AlgorithmPair,
-	cfg *config.VerifierConfig,
+		signedAttributes []byte,
+		encapsulatedContent []byte,
+		signature []byte,
+		cert *x509.Certificate,
+		algorithmPair types.AlgorithmPair,
+		cfg *config.VerifierConfig,
 ) error {
 	if err := validateSignedAttributes(signedAttributes, encapsulatedContent, algorithmPair.HashAlgorithm); err != nil {
 		return &types.SodError{
@@ -299,9 +297,9 @@ func parseCertificate(pemFile []byte) (*x509.Certificate, error) {
 }
 
 func validateSignedAttributes(
-	signedAttributes,
-	encapsulatedContent []byte,
-	hashAlgorithm types.HashAlgorithm,
+		signedAttributes,
+		encapsulatedContent []byte,
+		hashAlgorithm types.HashAlgorithm,
 ) error {
 	signedAttributesASN1 := make([]asn1.RawValue, 0)
 
@@ -339,10 +337,10 @@ func validateSignedAttributes(
 }
 
 func verifySignature(
-	signature []byte,
-	cert *x509.Certificate,
-	signedAttributes []byte,
-	algorithmPair types.AlgorithmPair,
+		signature []byte,
+		cert *x509.Certificate,
+		signedAttributes []byte,
+		algorithmPair types.AlgorithmPair,
 ) error {
 	h := types.GeneralHash(algorithmPair.HashAlgorithm)
 	h.Write(signedAttributes)
