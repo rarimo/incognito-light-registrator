@@ -20,11 +20,12 @@ type DocumentSOD struct {
 	DG15                string                      `db:"dg15" structs:"dg15"`
 	HashAlgorigthm      types.HashAlgorithm         `db:"hash_algorithm" structs:"hash_algorithm"`
 	SignatureAlgorithm  types.SignatureAlgorithm    `db:"signature_algorithm" structs:"signature_algorithm"`
-	SignedAttributed    string                      `db:"signed_attributes" structs:"signed_attributes"`
+	SignedAttributes    string                      `db:"signed_attributes" structs:"signed_attributes"`
 	EncapsulatedContent string                      `db:"encapsulated_content" structs:"encapsulated_content"`
 	Signature           string                      `db:"signature" structs:"signature"`
 	AaSignature         string                      `db:"aa_signature" structs:"aa_signature"`
 	PemFile             string                      `db:"pem_file" structs:"pem_file"`
+	Hash                string                      `db:"hash" structs:"hash"`
 	ErrorKind           *types.DocumentSODErrorKind `db:"error_kind" structs:"error_kind"`
 	Error               *string                     `db:"error" structs:"error"`
 }

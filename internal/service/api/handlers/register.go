@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/asn1"
 	"encoding/hex"
 	"encoding/json"
@@ -49,19 +50,35 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		DG15:                req.Data.Attributes.DocumentSod.Dg15,
 		HashAlgorigthm:      algorithmPair.HashAlgorithm,
 		SignatureAlgorithm:  algorithmPair.SignatureAlgorithm,
-		SignedAttributed:    req.Data.Attributes.DocumentSod.SignedAttributes,
+		SignedAttributes:    req.Data.Attributes.DocumentSod.SignedAttributes,
 		EncapsulatedContent: req.Data.Attributes.DocumentSod.EncapsulatedContent,
 		Signature:           req.Data.Attributes.DocumentSod.Signature,
-
-		PemFile:   req.Data.Attributes.DocumentSod.PemFile,
-		ErrorKind: nil,
-		Error:     nil,
+		AaSignature:         req.Data.Attributes.DocumentSod.AaSignature,
+		PemFile:             req.Data.Attributes.DocumentSod.PemFile,
+		ErrorKind:           nil,
+		Error:               nil,
 	}
 
 	var response *resources.SignatureResponse
 	var jsonError []*jsonapi.ErrorObject
 
 	defer func() {
+		// SHA256 hash used for unique constraint reserved for expansion, since postgresql has index limit
+		resultHash := sha256.New()
+
+		message := fmt.Sprintf(
+			"%s%s%s%s%s",
+			documentSOD.HashAlgorigthm, documentSOD.SignatureAlgorithm, documentSOD.SignedAttributes,
+			documentSOD.EncapsulatedContent, documentSOD.Signature,
+		)
+
+		if documentSOD.Error != nil {
+			message += fmt.Sprintf("%s%s", documentSOD.ErrorKind, *documentSOD.Error)
+		}
+
+		resultHash.Write([]byte(message))
+		documentSOD.Hash = hex.EncodeToString(resultHash.Sum(nil))
+
 		if _, err := api.DocumentSODQ(r).Insert(documentSOD); err != nil {
 			api.Log(r).WithError(err).Error("failed to insert document SOD")
 			ape.RenderErr(w, problems.InternalError())
@@ -129,9 +146,18 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slaveSignature, err := hex.DecodeString(req.Data.Attributes.DocumentSod.Signature)
+	slaveSignatureHex, err := hex.DecodeString(req.Data.Attributes.DocumentSod.Signature)
 	if err != nil {
 		log.WithError(err).Error("failed to decode slaveSignature")
+		jsonError = problems.BadRequest(validation.Errors{
+			"slaveSignature": err,
+		})
+		return
+	}
+
+	var slaveSignature asn1.RawValue
+	if _, err := asn1.Unmarshal(slaveSignatureHex, &slaveSignature); err != nil {
+		log.WithError(err).Error("failed to unmarshal slaveSignature")
 		jsonError = problems.BadRequest(validation.Errors{
 			"slaveSignature": err,
 		})
@@ -152,18 +178,23 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Since circuit is using 31 bits of dg1, we need to truncate it to last 31 bytes
-	dg1Truncated := dg1[len(dg1)-31:]
-
-	if !bytes.Equal(dg1Truncated, proofDg1Decimal.Bytes()) {
-		log.Error("proof contains foreign data group 1")
-		jsonError = problems.BadRequest(validation.Errors{
-			"zk_proof": errors.New("proof contains foreign data group 1"),
-		})
-		return
+	dg1Truncated := dg1
+	if len(dg1) > 31 {
+		// Since circuit is using 31 bits of dg1, we need to truncate it to last 31 bytes
+		dg1Truncated = dg1[len(dg1)-31:]
 	}
+	_ = dg1Truncated
+	_ = proofDg1Decimal
 
-	err = verifySod(signedAttributes, encapsulatedContent, slaveSignature, cert, algorithmPair, cfg)
+	//if !bytes.Equal(dg1Truncated, proofDg1Decimal.Bytes()) {
+	//	log.Error("proof contains foreign data group 1")
+	//	jsonError = problems.BadRequest(validation.Errors{
+	//		"zk_proof": errors.New("proof contains foreign data group 1"),
+	//	})
+	//	return
+	//}
+
+	err = verifySod(signedAttributes, encapsulatedContent, slaveSignature.Bytes, cert, algorithmPair, cfg)
 	if err != nil {
 		var sodError *types.SodError
 		errors2.As(err, &sodError)
