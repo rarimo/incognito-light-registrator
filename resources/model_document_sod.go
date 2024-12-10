@@ -5,27 +5,20 @@
 package resources
 
 type DocumentSod struct {
-	Key
-	Attributes DocumentSodAttributes `json:"attributes"`
-}
-type DocumentSodResponse struct {
-	Data     DocumentSod `json:"data"`
-	Included Included    `json:"included"`
-}
-
-type DocumentSodListResponse struct {
-	Data     []DocumentSod `json:"data"`
-	Included Included      `json:"included"`
-	Links    *Links        `json:"links"`
-}
-
-// MustDocumentSod - returns DocumentSod from include collection.
-// if entry with specified key does not exist - returns nil
-// if entry with specified key exists but type or ID mismatches - panics
-func (c *Included) MustDocumentSod(key Key) *DocumentSod {
-	var documentSod DocumentSod
-	if c.tryFindEntry(key, &documentSod) {
-		return &documentSod
-	}
-	return nil
+	// The active authentication signature
+	AaSignature string `json:"aa_signature"`
+	// The Data Group 15, hex string
+	Dg15 string `json:"dg15"`
+	// The encapsulated content, for e.g. 186 bytes-long hex string
+	EncapsulatedContent string `json:"encapsulated_content"`
+	// The hash algorithm used to hash the content
+	HashAlgorithm string `json:"hash_algorithm"`
+	// The PEM file containing the public key
+	PemFile string `json:"pem_file"`
+	// Signature corresponding to the algorithm
+	Signature string `json:"signature"`
+	// The signature algorithm used to sign the content
+	SignatureAlgorithm string `json:"signature_algorithm"`
+	// The signed attributes, for e.g. 104 bytes-long hex string
+	SignedAttributes string `json:"signed_attributes"`
 }

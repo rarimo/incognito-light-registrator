@@ -8,9 +8,10 @@ require (
 	github.com/fatih/structs v1.1.0
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
-	github.com/google/jsonapi v0.0.0-20200226002910-c8283f632fb7
 	github.com/hashicorp/vault/api v1.15.0
 	github.com/iden3/go-iden3-crypto v0.0.17
+	github.com/iden3/go-rapidsnark/types v0.0.3
+	github.com/iden3/go-rapidsnark/verifier v0.0.5
 	github.com/pkg/errors v0.9.1
 	github.com/rarimo/certificate-transparency-go v0.0.0-20240305114501-050b1f19639a
 	github.com/rubenv/sql-migrate v1.6.1
@@ -42,6 +43,7 @@ require (
 	github.com/go-gorp/gorp/v3 v3.1.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
+	github.com/google/jsonapi v0.0.0-20200226002910-c8283f632fb7 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect

@@ -9,10 +9,14 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"math/big"
 	"net/http"
 
+	"github.com/google/jsonapi"
 	"github.com/iden3/go-iden3-crypto/poseidon"
+	"github.com/iden3/go-rapidsnark/verifier"
 	errors2 "github.com/pkg/errors"
+	"github.com/rarimo/passport-identity-provider/internal/config"
 	"github.com/rarimo/passport-identity-provider/internal/data"
 	"github.com/rarimo/passport-identity-provider/internal/types"
 
@@ -37,40 +41,47 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	algorithmPair := types.AlgorithmPair{
-		HashAlgorithm:      types.HashAlgorithmFromString(req.Data.Attributes.HashAlgorithm),
-		SignatureAlgorithm: types.SignatureAlgorithmFromString(req.Data.Attributes.SignatureAlgorithm),
+		HashAlgorithm:      types.HashAlgorithmFromString(req.Data.Attributes.DocumentSod.HashAlgorithm),
+		SignatureAlgorithm: types.SignatureAlgorithmFromString(req.Data.Attributes.DocumentSod.SignatureAlgorithm),
 	}
 
 	documentSOD := data.DocumentSOD{
-		DG15:                req.Data.Attributes.Dg15,
+		DG15:                req.Data.Attributes.DocumentSod.Dg15,
 		HashAlgorigthm:      algorithmPair.HashAlgorithm,
 		SignatureAlgorithm:  algorithmPair.SignatureAlgorithm,
-		SignedAttributed:    req.Data.Attributes.SignedAttributes,
-		EncapsulatedContent: req.Data.Attributes.EncapsulatedContent,
-		Signature:           req.Data.Attributes.Signature,
-		PemFile:             req.Data.Attributes.PemFile,
-		ErrorKind:           nil,
-		Error:               nil,
+		SignedAttributed:    req.Data.Attributes.DocumentSod.SignedAttributes,
+		EncapsulatedContent: req.Data.Attributes.DocumentSod.EncapsulatedContent,
+		Signature:           req.Data.Attributes.DocumentSod.Signature,
+
+		PemFile:   req.Data.Attributes.DocumentSod.PemFile,
+		ErrorKind: nil,
+		Error:     nil,
 	}
 
-	var response resources.RegisterResponse
+	var response *resources.SignatureResponse
+	var jsonError []*jsonapi.ErrorObject
 
-	defer func(documentSOD *data.DocumentSOD, response *resources.RegisterResponse) {
-		if _, err := api.DocumentSODQ(r).Insert(*documentSOD); err != nil {
+	defer func() {
+		if _, err := api.DocumentSODQ(r).Insert(documentSOD); err != nil {
 			api.Log(r).WithError(err).Error("failed to insert document SOD")
 			ape.RenderErr(w, problems.InternalError())
+			return
+		}
+
+		if jsonError != nil {
+			ape.RenderErr(w, jsonError...)
 			return
 		}
 
 		if response != nil {
 			ape.Render(w, response)
 		}
-	}(&documentSOD, &response)
+	}()
 
 	rawReqData, err := json.Marshal(req.Data)
 	if err != nil {
 		api.Log(r).WithError(err).Error("failed to marshal register request")
-		ape.RenderErr(w, problems.InternalError())
+		jsonError = append(jsonError, problems.InternalError())
 		return
 	}
 	log := api.Log(r).WithFields(logan.F{
@@ -80,43 +91,79 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 	cfg := api.VerifierConfig(r)
 
-	signedAttributes, err := hex.DecodeString(req.Data.Attributes.SignedAttributes)
+	if err := verifier.VerifyGroth16(
+		req.Data.Attributes.ZkProof,
+		cfg.VerificationKeys[types.SHA256],
+	); err != nil {
+		log.WithError(err).Error("failed to verify zk proof")
+		jsonError = problems.BadRequest(validation.Errors{
+			"zk_proof": err,
+		})
+		return
+	}
+
+	signedAttributes, err := hex.DecodeString(req.Data.Attributes.DocumentSod.SignedAttributes)
 	if err != nil {
 		log.WithError(err).Error("failed to decode signed attributes")
-		ape.RenderErr(w, problems.BadRequest(validation.Errors{
+		jsonError = problems.BadRequest(validation.Errors{
 			"signed_attributes": err,
-		})...)
+		})
 		return
 	}
 
-	encapsulatedContent, err := hex.DecodeString(req.Data.Attributes.EncapsulatedContent)
+	encapsulatedContent, err := hex.DecodeString(req.Data.Attributes.DocumentSod.EncapsulatedContent)
 	if err != nil {
 		log.WithError(err).Error("failed to decode encapsulated content")
-		ape.RenderErr(w, problems.BadRequest(validation.Errors{
+		jsonError = problems.BadRequest(validation.Errors{
 			"encapsulated_content": err,
-		})...)
+		})
 		return
 	}
 
-	cert, err := parseCertificate([]byte(req.Data.Attributes.PemFile))
+	cert, err := parseCertificate([]byte(req.Data.Attributes.DocumentSod.PemFile))
 	if err != nil {
 		log.WithError(err).Error("failed to parse certificate")
-		ape.RenderErr(w, problems.BadRequest(validation.Errors{
+		jsonError = problems.BadRequest(validation.Errors{
 			"pem_file": err,
-		})...)
+		})
 		return
 	}
 
-	slaveSignature, err := hex.DecodeString(req.Data.Attributes.Signature)
+	slaveSignature, err := hex.DecodeString(req.Data.Attributes.DocumentSod.Signature)
 	if err != nil {
 		log.WithError(err).Error("failed to decode slaveSignature")
-		ape.RenderErr(w, problems.BadRequest(validation.Errors{
+		jsonError = problems.BadRequest(validation.Errors{
 			"slaveSignature": err,
-		})...)
+		})
 		return
 	}
 
-	err = verifySod(signedAttributes, encapsulatedContent, slaveSignature, cert, algorithmPair, cfg.MasterCerts)
+	dg1, err := getDataGroup(encapsulatedContent, 0)
+	if err != nil {
+		log.WithError(err).Error("failed to get data group")
+		jsonError = append(jsonError, problems.InternalError())
+		return
+	}
+
+	proofDg1Decimal, ok := big.NewInt(0).SetString(req.Data.Attributes.ZkProof.PubSignals[0], 10)
+	if !ok {
+		log.Error("failed to convert proofDg1Decimal to big.Int")
+		jsonError = append(jsonError, problems.InternalError())
+		return
+	}
+
+	// Since circuit is using 31 bits of dg1, we need to truncate it to last 31 bytes
+	dg1Truncated := dg1[len(dg1)-31:]
+
+	if !bytes.Equal(dg1Truncated, proofDg1Decimal.Bytes()) {
+		log.Error("proof contains foreign data group 1")
+		jsonError = problems.BadRequest(validation.Errors{
+			"zk_proof": errors.New("proof contains foreign data group 1"),
+		})
+		return
+	}
+
+	err = verifySod(signedAttributes, encapsulatedContent, slaveSignature, cert, algorithmPair, cfg)
 	if err != nil {
 		var sodError *types.SodError
 		errors2.As(err, &sodError)
@@ -127,7 +174,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		documentSOD.Error = sodError.GetOptionalMessage()
 
 		if resp := mapResponse(sodError.Kind, sodError.Message); resp != nil {
-			ape.RenderErr(w, problems.BadRequest(resp)...)
+			jsonError = problems.BadRequest(resp)
 			return
 		}
 	}
@@ -135,21 +182,14 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	truncatedSignedAttributes, err := extractBits(signedAttributes, 252)
 	if err != nil {
 		log.WithError(err).Error("failed to extract bits from signed attributes")
-		ape.RenderErr(w, problems.InternalError())
+		jsonError = append(jsonError, problems.InternalError())
 		return
 	}
 
 	documentHash, err := poseidon.HashBytes(truncatedSignedAttributes)
 	if err != nil {
 		log.WithError(err).Error("failed to hash signed attributes")
-		ape.RenderErr(w, problems.InternalError())
-		return
-	}
-
-	dg1, err := getDataGroup(encapsulatedContent, 0)
-	if err != nil {
-		log.WithError(err).Error("failed to get data group")
-		ape.RenderErr(w, problems.InternalError())
+		jsonError = append(jsonError, problems.InternalError())
 		return
 	}
 
@@ -158,28 +198,28 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	signature, err := ecdsa.SignASN1(rand.Reader, api.KeysConfig(r).SignatureKey, message)
 	if err != nil {
 		log.WithError(err).Error("failed to sign message")
-		ape.RenderErr(w, problems.InternalError())
+		jsonError = append(jsonError, problems.InternalError())
 		return
 	}
 
-	response = resources.RegisterResponse{
-		Data: resources.Register{
-			Key: resources.NewKeyInt64(0, resources.REGISTER),
-			Attributes: resources.RegisterAttributes{
-				Signature:    hex.EncodeToString(signature),
+	response = &resources.SignatureResponse{
+		Data: resources.Signature{
+			Key: resources.NewKeyInt64(0, resources.SIGNATURE),
+			Attributes: resources.SignatureAttributes{
 				DocumentHash: hex.EncodeToString(documentHash.Bytes()),
+				Signature:    hex.EncodeToString(signature),
 			},
 		},
 	}
 }
 
 func verifySod(
-		signedAttributes []byte,
-		encapsulatedContent []byte,
-		signature []byte,
-		cert *x509.Certificate,
-		algorithmPair types.AlgorithmPair,
-		masterCertsPem []byte,
+	signedAttributes []byte,
+	encapsulatedContent []byte,
+	signature []byte,
+	cert *x509.Certificate,
+	algorithmPair types.AlgorithmPair,
+	cfg *config.VerifierConfig,
 ) error {
 	if err := validateSignedAttributes(signedAttributes, encapsulatedContent, algorithmPair.HashAlgorithm); err != nil {
 		return &types.SodError{
@@ -203,7 +243,7 @@ func verifySod(
 		}
 	}
 
-	if err := validateCert(cert, masterCertsPem); err != nil {
+	if err := validateCert(cert, cfg.MasterCerts, cfg.DisableTimeChecks, cfg.DisableNameChecks); err != nil {
 		return &types.SodError{
 			Kind:    types.PEMFileValidateErr.Ptr(),
 			Message: err,
@@ -228,9 +268,9 @@ func parseCertificate(pemFile []byte) (*x509.Certificate, error) {
 }
 
 func validateSignedAttributes(
-		signedAttributes,
-		encapsulatedContent []byte,
-		hashAlgorithm types.HashAlgorithm,
+	signedAttributes,
+	encapsulatedContent []byte,
+	hashAlgorithm types.HashAlgorithm,
 ) error {
 	signedAttributesASN1 := make([]asn1.RawValue, 0)
 
@@ -268,10 +308,10 @@ func validateSignedAttributes(
 }
 
 func verifySignature(
-		signature []byte,
-		cert *x509.Certificate,
-		signedAttributes []byte,
-		algorithmPair types.AlgorithmPair,
+	signature []byte,
+	cert *x509.Certificate,
+	signedAttributes []byte,
+	algorithmPair types.AlgorithmPair,
 ) error {
 	h := types.GeneralHash(algorithmPair.HashAlgorithm)
 	h.Write(signedAttributes)
@@ -284,14 +324,14 @@ func verifySignature(
 	return nil
 }
 
-func validateCert(cert *x509.Certificate, masterCertsPem []byte) error {
+func validateCert(cert *x509.Certificate, masterCertsPem []byte, disableTimeChecks, disableNameChecks bool) error {
 	roots := x509.NewCertPool()
 	roots.AppendCertsFromPEM(masterCertsPem)
 
 	foundCerts, err := cert.Verify(x509.VerifyOptions{
 		Roots:             roots,
-		DisableTimeChecks: true,
-		DisableNameChecks: true,
+		DisableTimeChecks: disableTimeChecks,
+		DisableNameChecks: disableNameChecks,
 	})
 	if err != nil {
 		return fmt.Errorf("invalid certificate: %w", err)

@@ -10,4 +10,5 @@ type ResourceType string
 const (
 	DOCUMENT_SOD ResourceType = "document-sod"
 	REGISTER     ResourceType = "register"
+	SIGNATURE    ResourceType = "signature"
 )

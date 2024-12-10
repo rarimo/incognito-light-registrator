@@ -13,7 +13,7 @@ post:
           properties:
             data:
               type: object
-              $ref: '#/components/schemas/DocumentSod'
+              $ref: '#/components/schemas/Register'
   responses:
     '200':
       description: Success
@@ -24,7 +24,7 @@ post:
             properties:
               data:
                 type: object
-                $ref: '#/components/schemas/Register'
+                $ref: '#/components/schemas/Signature'
     '500':
       description: Internal Error
       content:

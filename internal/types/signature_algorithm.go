@@ -3,9 +3,13 @@ package types
 import (
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rsa"
+	"fmt"
 	"hash"
+	"reflect"
 
+	"github.com/keybase/go-crypto/brainpool"
 	"github.com/rarimo/passport-identity-provider/internal/algorithms"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
@@ -43,17 +47,9 @@ func GeneralVerify(publicKey interface{}, hash []byte, signature []byte, algo Al
 		if !ok {
 			return ErrInvalidPublicKey{Expected: algo.SignatureAlgorithm}
 		}
-		if !ecdsa.VerifyASN1(ecdsaKey, hash, signature) {
-			return errors.New("ECDSA verification failed")
-		}
-	case Brainpool:
-		ecdsaKey, ok := publicKey.(*ecdsa.PublicKey)
-		if !ok {
-			return ErrInvalidPublicKey{Expected: algo.SignatureAlgorithm}
-		}
 
-		if err := algorithms.VerifyBrainpool(hash, signature, ecdsaKey); err != nil {
-			return errors.Wrap(err, "failed to verify brainpool signature")
+		if err := verifyECDSA(ecdsaKey, hash, signature); err != nil {
+			return errors.Wrap(err, "failed to verify ECDSA signature")
 		}
 	default:
 		return errors.New("unsupported signature algorithm")
@@ -65,6 +61,8 @@ func GeneralHash(algorithm HashAlgorithm) hash.Hash {
 	switch algorithm {
 	case SHA1:
 		return crypto.SHA1.New()
+	case SHA224:
+		return crypto.SHA224.New()
 	case SHA256:
 		return crypto.SHA256.New()
 	case SHA384:
@@ -81,6 +79,8 @@ func getCryptoHash(hashAlgorithm HashAlgorithm) crypto.Hash {
 	switch hashAlgorithm {
 	case SHA1:
 		return crypto.SHA1
+	case SHA224:
+		return crypto.SHA224
 	case SHA256:
 		return crypto.SHA256
 	case SHA384:
@@ -90,4 +90,23 @@ func getCryptoHash(hashAlgorithm HashAlgorithm) crypto.Hash {
 	default:
 		return 0
 	}
+}
+
+func verifyECDSA(ecdsaKey *ecdsa.PublicKey, hash []byte, signature []byte) error {
+	//print type of ecdsaKey.Curve
+	fmt.Println(reflect.TypeOf(ecdsaKey.Curve))
+	switch ecdsaKey.Curve {
+	case elliptic.P224(), elliptic.P256(), elliptic.P384(), elliptic.P521():
+		if !ecdsa.VerifyASN1(ecdsaKey, hash, signature) {
+			return errors.New("ECDSA verification failed")
+		}
+	case brainpool.P256r1(), brainpool.P384r1(), brainpool.P512r1(),
+		brainpool.P256t1(), brainpool.P384t1(), brainpool.P512t1():
+		if err := algorithms.VerifyBrainpool(hash, signature, ecdsaKey); err != nil {
+			return errors.Wrap(err, "failed to verify brainpool signature")
+		}
+	default:
+		return errors.New("unsupported curve")
+	}
+	return nil
 }

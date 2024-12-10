@@ -14,4 +14,4 @@ FROM alpine:3.9
 COPY --from=buildbase /usr/local/bin/incognito-light-registrator /usr/local/bin/incognito-light-registrator
 RUN apk add --no-cache ca-certificates
 
-ENTRYPOINT ["incognito-light-registrator", "run", "service"]
+ENTRYPOINT ["incognito-light-registrator"]

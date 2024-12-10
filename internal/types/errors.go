@@ -44,7 +44,7 @@ type SodError struct {
 }
 
 func (e *SodError) Error() string {
-	return fmt.Sprintf("%s: %e", e.Kind, e.Message)
+	return fmt.Sprintf("%s: %s", e.Kind, e.Message)
 }
 
 func (e *SodError) GetOptionalMessage() *string {

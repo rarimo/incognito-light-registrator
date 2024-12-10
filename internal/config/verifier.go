@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 
+	"github.com/rarimo/passport-identity-provider/internal/types"
 	"gitlab.com/distributed_lab/figure/v3"
 	"gitlab.com/distributed_lab/kit/comfig"
 	"gitlab.com/distributed_lab/kit/kv"
@@ -13,7 +14,10 @@ type VerifierConfiger interface {
 }
 
 type VerifierConfig struct {
-	MasterCerts []byte
+	VerificationKeys  map[types.HashAlgorithm][]byte
+	MasterCerts       []byte
+	DisableTimeChecks bool
+	DisableNameChecks bool
 }
 
 type verifier struct {
@@ -30,7 +34,10 @@ func NewVerifierConfiger(getter kv.Getter) VerifierConfiger {
 func (v *verifier) VerifierConfig() *VerifierConfig {
 	return v.once.Do(func() interface{} {
 		newCfg := struct {
-			MasterCertsPath string `fig:"master_certs_path,required"`
+			VerificationKeysPaths map[string]string `fig:"verification_keys_paths,required"`
+			MasterCertsPath       string            `fig:"master_certs_path,required"`
+			DisableTimeChecks     bool              `fig:"disable_time_checks"`
+			DisableNameChecks     bool              `fig:"disable_name_checks"`
 		}{}
 
 		err := figure.
@@ -42,13 +49,26 @@ func (v *verifier) VerifierConfig() *VerifierConfig {
 			panic(err)
 		}
 
+		verificationKeys := make(map[types.HashAlgorithm][]byte)
+		for algo, path := range newCfg.VerificationKeysPaths {
+			verificationKey, err := os.ReadFile(path)
+			if err != nil {
+				panic(err)
+			}
+
+			verificationKeys[types.HashAlgorithmFromString(algo)] = verificationKey
+		}
+
 		masterCerts, err := os.ReadFile(newCfg.MasterCertsPath)
 		if err != nil {
 			panic(err)
 		}
 
 		return &VerifierConfig{
-			MasterCerts: masterCerts,
+			VerificationKeys:  verificationKeys,
+			MasterCerts:       masterCerts,
+			DisableTimeChecks: newCfg.DisableTimeChecks,
+			DisableNameChecks: newCfg.DisableNameChecks,
 		}
 	}).(*VerifierConfig)
 }

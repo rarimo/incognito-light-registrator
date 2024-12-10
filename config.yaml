@@ -1,5 +1,13 @@
 verifier:
+  verification_keys_paths:
+    sha1: "./verification_keys/registerIdentityLight160.json"
+    sha224: "./verification_keys/registerIdentityLight224.json"
+    sha256: "./verification_keys/registerIdentityLight256.json"
+    sha384: "./verification_keys/registerIdentityLight384.json"
+    sha512: "./verification_keys/registerIdentityLight512.json"
   master_certs_path: "./masterList.dev.pem"
+  disableTimeChecks: false
+  disableNameChecks: false
 
 log:
   level: debug

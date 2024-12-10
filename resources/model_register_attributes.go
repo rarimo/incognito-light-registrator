@@ -4,9 +4,10 @@
 
 package resources
 
+import "github.com/iden3/go-rapidsnark/types"
+
 type RegisterAttributes struct {
-	// Poseidon hash of the document
-	DocumentHash string `json:"document_hash"`
-	// ECDSA signature of the document hash
-	Signature string `json:"signature"`
+	DocumentSod DocumentSod `json:"document_sod"`
+	// Zero-knowledge proof with dg1 public input
+	ZkProof types.ZKProof `json:"zk_proof"`
 }
