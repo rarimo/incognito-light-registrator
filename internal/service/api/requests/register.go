@@ -63,6 +63,10 @@ func validateRegister(r resources.RegisterResponse) error {
 			validation.Required,
 			validation.Length(1, 4096),
 		),
+		"/data/attributes/document_sod/aa_signature": validation.Validate(
+			r.Data.Attributes.DocumentSod.AaSignature,
+			validation.Length(0, 4096),
+		),
 		"/data/attributes/document_sod/pem_file": validation.Validate(
 			r.Data.Attributes.DocumentSod.PemFile,
 			validation.Required,
