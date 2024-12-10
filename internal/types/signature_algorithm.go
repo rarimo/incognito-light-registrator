@@ -6,7 +6,6 @@ import (
 	"crypto/rsa"
 	"hash"
 
-	"github.com/rarimo/passport-identity-provider/internal/algorithms"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
@@ -43,10 +42,18 @@ func GeneralVerify(publicKey interface{}, hash []byte, signature []byte, algo Al
 		if !ok {
 			return ErrInvalidPublicKey{Expected: algo.SignatureAlgorithm}
 		}
-		return algorithms.VerifyECDSA(hash, signature, ecdsaKey)
+		return verifyECDSA(hash, signature, ecdsaKey)
 	default:
 		return errors.New("unsupported signature algorithm")
 	}
+}
+
+func verifyECDSA(data, sig []byte, publicKey *ecdsa.PublicKey) error {
+	if ok := ecdsa.VerifyASN1(publicKey, data, sig); !ok {
+		return errors.New("failed to verify ECDSA signature")
+	}
+
+	return nil
 }
 
 func GeneralHash(algorithm HashAlgorithm) hash.Hash {

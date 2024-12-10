@@ -45,8 +45,7 @@ func validateRegister(r resources.RegisterResponse) error {
 			})),
 		"/data/attributes/document_sod/dg15": validation.Validate(
 			r.Data.Attributes.DocumentSod.Dg15,
-			validation.Required,
-			validation.Length(1, 512),
+			validation.Length(0, 512),
 		),
 		"/data/attributes/document_sod/signed_attributes": validation.Validate(
 			r.Data.Attributes.DocumentSod.SignedAttributes,
