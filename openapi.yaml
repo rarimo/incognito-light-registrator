@@ -58,7 +58,6 @@ components:
         - signature
         - encapsulated_content
         - pem_file
-        - dg15
       properties:
         hash_algorithm:
           type: string

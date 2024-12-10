@@ -88,8 +88,7 @@
           "signed_attributes",
           "signature",
           "encapsulated_content",
-          "pem_file",
-          "dg15"
+          "pem_file"
         ],
         "properties": {
           "hash_algorithm": {
