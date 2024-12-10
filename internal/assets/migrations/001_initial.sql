@@ -11,7 +11,7 @@ create table document_sod
     signed_attributes    varchar(512)                not null, -- hex encoded
     encapsulated_content varchar(4096)               not null, -- hex encoded
     signature            varchar(4096)               not null, -- hex encoded
-    aa_signature         varchar(4096)               not null, -- hex encoded
+    aa_signature         varchar(4096),                        -- hex encoded
     pem_file             varchar(4096)               not null,
     error_kind           smallint,                             -- 0 - signed attributes validation failed, 1 - PEM file parsing failed, 2 - PEM file validation failed, 3 - signature verification failed
     error                varchar(1024),                        -- error message

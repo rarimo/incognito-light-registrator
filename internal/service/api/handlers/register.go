@@ -59,7 +59,8 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Data.Attributes.DocumentSod.AaSignature != nil {
-		documentSOD.AaSignature = truncateHexPrefix(*req.Data.Attributes.DocumentSod.AaSignature)
+		truncatedAaSignature := truncateHexPrefix(*req.Data.Attributes.DocumentSod.AaSignature)
+		documentSOD.AaSignature = &truncatedAaSignature
 	}
 
 	var response *resources.SignatureResponse

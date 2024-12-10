@@ -23,7 +23,7 @@ type DocumentSOD struct {
 	SignedAttributes    string                      `db:"signed_attributes" structs:"signed_attributes"`
 	EncapsulatedContent string                      `db:"encapsulated_content" structs:"encapsulated_content"`
 	Signature           string                      `db:"signature" structs:"signature"`
-	AaSignature         string                      `db:"aa_signature" structs:"aa_signature"`
+	AaSignature         *string                     `db:"aa_signature" structs:"aa_signature"`
 	PemFile             string                      `db:"pem_file" structs:"pem_file"`
 	Hash                string                      `db:"hash" structs:"hash"`
 	ErrorKind           *types.DocumentSODErrorKind `db:"error_kind" structs:"error_kind"`
