@@ -47,16 +47,19 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	documentSOD := data.DocumentSOD{
-		DG15:                req.Data.Attributes.DocumentSod.Dg15,
+		DG15:                truncateHexPrefix(req.Data.Attributes.DocumentSod.Dg15),
 		HashAlgorigthm:      algorithmPair.HashAlgorithm,
 		SignatureAlgorithm:  algorithmPair.SignatureAlgorithm,
-		SignedAttributes:    req.Data.Attributes.DocumentSod.SignedAttributes,
-		EncapsulatedContent: req.Data.Attributes.DocumentSod.EncapsulatedContent,
-		Signature:           req.Data.Attributes.DocumentSod.Signature,
-		AaSignature:         req.Data.Attributes.DocumentSod.AaSignature,
+		SignedAttributes:    truncateHexPrefix(req.Data.Attributes.DocumentSod.SignedAttributes),
+		EncapsulatedContent: truncateHexPrefix(req.Data.Attributes.DocumentSod.EncapsulatedContent),
+		Signature:           truncateHexPrefix(req.Data.Attributes.DocumentSod.Signature),
 		PemFile:             req.Data.Attributes.DocumentSod.PemFile,
 		ErrorKind:           nil,
 		Error:               nil,
+	}
+
+	if req.Data.Attributes.DocumentSod.AaSignature != nil {
+		documentSOD.AaSignature = truncateHexPrefix(*req.Data.Attributes.DocumentSod.AaSignature)
 	}
 
 	var response *resources.SignatureResponse
@@ -119,7 +122,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	signedAttributes, err := hex.DecodeString(req.Data.Attributes.DocumentSod.SignedAttributes)
+	signedAttributes, err := hex.DecodeString(truncateHexPrefix(req.Data.Attributes.DocumentSod.SignedAttributes))
 	if err != nil {
 		log.WithError(err).Error("failed to decode signed attributes")
 		jsonError = problems.BadRequest(validation.Errors{
@@ -128,7 +131,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	encapsulatedContent, err := hex.DecodeString(req.Data.Attributes.DocumentSod.EncapsulatedContent)
+	encapsulatedContent, err := hex.DecodeString(truncateHexPrefix(req.Data.Attributes.DocumentSod.EncapsulatedContent))
 	if err != nil {
 		log.WithError(err).Error("failed to decode encapsulated content")
 		jsonError = problems.BadRequest(validation.Errors{
@@ -146,7 +149,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slaveSignatureHex, err := hex.DecodeString(req.Data.Attributes.DocumentSod.Signature)
+	slaveSignatureHex, err := hex.DecodeString(truncateHexPrefix(req.Data.Attributes.DocumentSod.Signature))
 	if err != nil {
 		log.WithError(err).Error("failed to decode slaveSignature")
 		jsonError = problems.BadRequest(validation.Errors{
@@ -431,4 +434,12 @@ func getDataGroup(encapsulatedContent []byte, index int) ([]byte, error) {
 	}
 
 	return privKeyEl.OctetStr.Bytes, nil
+}
+
+func truncateHexPrefix(hexString string) string {
+	if len(hexString) > 2 && hexString[:2] == "0x" {
+		return hexString[2:]
+	}
+
+	return hexString
 }

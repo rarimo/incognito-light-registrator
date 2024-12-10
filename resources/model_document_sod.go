@@ -6,7 +6,7 @@ package resources
 
 type DocumentSod struct {
 	// The active authentication signature
-	AaSignature string `json:"aa_signature"`
+	AaSignature *string `json:"aa_signature,omitempty"`
 	// The Data Group 15, hex string
 	Dg15 string `json:"dg15"`
 	// The encapsulated content, for e.g. 186 bytes-long hex string

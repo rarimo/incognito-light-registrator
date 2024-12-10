@@ -5,7 +5,6 @@ required:
   - signed_attributes
   - signature
   - encapsulated_content
-  - aa_signature
   - pem_file
   - dg15
 properties:
