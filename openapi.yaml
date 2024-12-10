@@ -23,7 +23,7 @@ paths:
               properties:
                 data:
                   type: object
-                  $ref: '#/components/schemas/DocumentSod'
+                  $ref: '#/components/schemas/Register'
       responses:
         '200':
           description: Success
@@ -34,7 +34,7 @@ paths:
                 properties:
                   data:
                     type: object
-                    $ref: '#/components/schemas/Register'
+                    $ref: '#/components/schemas/Signature'
         '400':
           description: Bad Request Error
           content:
@@ -50,44 +50,41 @@ paths:
 components:
   schemas:
     DocumentSod:
-      allOf:
-        - $ref: '#/components/schemas/DocumentSodKey'
-        - type: object
-          required:
-            - attributes
-          properties:
-            attributes:
-              type: object
-              required:
-                - hash_algorithm
-                - signature_algorithm
-                - signed_attributes
-                - signature
-                - encapsulated_content
-                - pem_file
-                - dg15
-              properties:
-                hash_algorithm:
-                  type: string
-                  description: The hash algorithm used to hash the content
-                signature_algorithm:
-                  type: string
-                  description: The signature algorithm used to sign the content
-                signed_attributes:
-                  type: string
-                  description: 'The signed attributes, for e.g. 104 bytes-long hex string'
-                signature:
-                  type: string
-                  description: Signature corresponding to the algorithm
-                encapsulated_content:
-                  type: string
-                  description: 'The encapsulated content, for e.g. 186 bytes-long hex string'
-                pem_file:
-                  type: string
-                  description: The PEM file containing the public key
-                dg15:
-                  type: string
-                  description: 'The Data Group 15, hex string'
+      type: object
+      required:
+        - hash_algorithm
+        - signature_algorithm
+        - signed_attributes
+        - signature
+        - encapsulated_content
+        - aa_signature
+        - pem_file
+        - dg15
+      properties:
+        hash_algorithm:
+          type: string
+          description: The hash algorithm used to hash the content
+        signature_algorithm:
+          type: string
+          description: The signature algorithm used to sign the content
+        signed_attributes:
+          type: string
+          description: 'The signed attributes, for e.g. 104 bytes-long hex string'
+        signature:
+          type: string
+          description: Signature corresponding to the algorithm
+        aa_signature:
+          type: string
+          description: The active authentication signature
+        encapsulated_content:
+          type: string
+          description: 'The encapsulated content, for e.g. 186 bytes-long hex string'
+        pem_file:
+          type: string
+          description: The PEM file containing the public key
+        dg15:
+          type: string
+          description: 'The Data Group 15, hex string'
     DocumentSodKey:
       type: object
       required:
@@ -144,17 +141,15 @@ components:
             attributes:
               type: object
               required:
-                - signature
-                - document_hash
+                - zk_proof
+                - document_sod
               properties:
-                signature:
-                  type: string
-                  example: 7768792064696420796F75206576656E206465636F6465642069743F
-                  description: ECDSA signature of the document hash
-                document_hash:
-                  type: string
-                  example: 7768792064696420796F75206576656E206465636F6465642069743F
-                  description: Poseidon hash of the document
+                zk_proof:
+                  type: object
+                  format: types.ZKProof
+                  description: Zero-knowledge proof with dg1 public input
+                document_sod:
+                  $ref: '#/components/schemas/DocumentSod'
     RegisterKey:
       type: object
       required:
@@ -167,6 +162,39 @@ components:
           type: string
           enum:
             - register
+    Signature:
+      allOf:
+        - $ref: '#/components/schemas/SignatureKey'
+        - type: object
+          required:
+            - attributes
+          properties:
+            attributes:
+              type: object
+              required:
+                - signature
+                - document_hash
+              properties:
+                signature:
+                  type: string
+                  example: 7768792064696420796F75206576656E206465636F6465642069743F
+                  description: ECDSA signature of the document hash
+                document_hash:
+                  type: string
+                  example: 7768792064696420796F75206576656E206465636F6465642069743F
+                  description: Poseidon hash of the document
+    SignatureKey:
+      type: object
+      required:
+        - id
+        - type
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum:
+            - signature
   parameters:
     pageLimitParam:
       in: query
