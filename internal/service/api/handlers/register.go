@@ -33,6 +33,10 @@ import (
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
+const (
+	DG1TruncateLength = 31
+)
+
 func Register(w http.ResponseWriter, r *http.Request) {
 	req, err := requests.NewRegisterRequest(r)
 	if err != nil {
@@ -47,7 +51,6 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	documentSOD := data.DocumentSOD{
-		DG15:                truncateHexPrefix(req.Data.Attributes.DocumentSod.Dg15),
 		HashAlgorigthm:      algorithmPair.HashAlgorithm,
 		SignatureAlgorithm:  algorithmPair.SignatureAlgorithm,
 		SignedAttributes:    truncateHexPrefix(req.Data.Attributes.DocumentSod.SignedAttributes),
@@ -61,6 +64,11 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	if req.Data.Attributes.DocumentSod.AaSignature != nil {
 		truncatedAaSignature := truncateHexPrefix(*req.Data.Attributes.DocumentSod.AaSignature)
 		documentSOD.AaSignature = &truncatedAaSignature
+	}
+
+	if req.Data.Attributes.DocumentSod.Dg15 != nil {
+		truncatedDg15 := truncateHexPrefix(*req.Data.Attributes.DocumentSod.Dg15)
+		documentSOD.DG15 = &truncatedDg15
 	}
 
 	var response *resources.SignatureResponse
@@ -83,7 +91,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		resultHash.Write([]byte(message))
 		documentSOD.Hash = hex.EncodeToString(resultHash.Sum(nil))
 
-		if _, err := api.DocumentSODQ(r).Insert(documentSOD); err != nil {
+		if _, err := api.DocumentSODQ(r).Upsert(documentSOD); err != nil {
 			api.Log(r).WithError(err).Error("failed to insert document SOD")
 			ape.RenderErr(w, problems.InternalError())
 			return
@@ -114,7 +122,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 	if err := verifier.VerifyGroth16(
 		req.Data.Attributes.ZkProof,
-		cfg.VerificationKeys[types.SHA256],
+		cfg.VerificationKeys[algorithmPair.HashAlgorithm],
 	); err != nil {
 		log.WithError(err).Error("failed to verify zk proof")
 		jsonError = problems.BadRequest(validation.Errors{
@@ -183,12 +191,12 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dg1Truncated := dg1
-	if len(dg1) > 31 {
-		// Since circuit is using 31 bits of dg1, we need to truncate it to last 31 bytes
-		dg1Truncated = dg1[len(dg1)-31:]
+	if len(dg1) > DG1TruncateLength {
+		// Since circuit is using DG1TruncateLength bytes of dg1, we need to truncate it to first DG1TruncateLength bytes
+		dg1Truncated = dg1[len(dg1)-DG1TruncateLength:]
 	}
 
-	if !bytes.Equal(dg1Truncated, proofDg1Decimal.Bytes()) {
+	if !bytes.Equal(dg1Truncated, proofDg1Decimal.FillBytes(make([]byte, DG1TruncateLength))) {
 		log.Error("proof contains foreign data group 1")
 		jsonError = problems.BadRequest(validation.Errors{
 			"zk_proof": errors.New("proof contains foreign data group 1"),

@@ -60,7 +60,7 @@ func (q *DocumentSODQ) Select() ([]data.DocumentSOD, error) {
 	return result, err
 }
 
-func (q *DocumentSODQ) Insert(value data.DocumentSOD) (*data.DocumentSOD, error) {
+func (q *DocumentSODQ) Upsert(value data.DocumentSOD) (*data.DocumentSOD, error) {
 	var result data.DocumentSOD
 	clauses := structs.Map(value)
 	stmt := sq.Insert(documentSODTableName).SetMap(clauses).Suffix(

@@ -9,7 +9,7 @@ import (
 type DocumentSODQ interface {
 	New() DocumentSODQ
 	Get() (*DocumentSOD, error)
-	Insert(data DocumentSOD) (*DocumentSOD, error)
+	Upsert(data DocumentSOD) (*DocumentSOD, error)
 	ResetFilters() DocumentSODQ
 }
 
@@ -17,7 +17,7 @@ type DocumentSOD struct {
 	ID                  int64                       `db:"id" structs:"-"`
 	CreatedAt           time.Time                   `db:"created_at" structs:"-"`
 	UpdatedAt           time.Time                   `db:"updated_at" structs:"-"`
-	DG15                string                      `db:"dg15" structs:"dg15"`
+	DG15                *string                     `db:"dg15" structs:"dg15"`
 	HashAlgorigthm      types.HashAlgorithm         `db:"hash_algorithm" structs:"hash_algorithm"`
 	SignatureAlgorithm  types.SignatureAlgorithm    `db:"signature_algorithm" structs:"signature_algorithm"`
 	SignedAttributes    string                      `db:"signed_attributes" structs:"signed_attributes"`

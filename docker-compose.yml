@@ -1,0 +1,41 @@
+version: "3.3"
+
+services:
+  ##
+  ## Integration services
+  ##
+
+  ilr-service:
+    image: incognito-light-registrator
+    restart: unless-stopped
+    environment:
+      KV_VIPER_FILE: /config.yaml
+    volumes:
+      - ./config.docker.yaml:/config.yaml
+      - ./verification_keys:/verification_keys
+      - ./masterList.dev.pem:/masterList.dev.pem
+    entrypoint: sh -c "incognito-light-registrator migrate up && incognito-light-registrator run service"
+    ports:
+      - "8300:80"
+    depends_on:
+      - ilreg_db
+
+  ##
+  ## Databases
+  ##
+  ilreg_db:
+    image: postgres:latest
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=ilr
+      - POSTGRES_PASSWORD=ilr
+      - POSTGRES_DB=ilr
+      - PGDATA=/pgdata
+    volumes:
+      - ilreg-data:/pgdata
+    ports:
+      - 5433:5432
+
+
+volumes:
+  ilreg-data:
