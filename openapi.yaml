@@ -7,7 +7,7 @@ servers:
   - url: 'https://api.demo.tokend.io'
     description: TokenD Developer Environment
 paths:
-  /intergrations/incognito-light-registrator/v1/register:
+  /integrations/incognito-light-registrator/v1/register:
     post:
       tags:
         - Register

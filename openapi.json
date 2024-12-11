@@ -12,7 +12,7 @@
     }
   ],
   "paths": {
-    "/intergrations/incognito-light-registrator/v1/register": {
+    "/integrations/incognito-light-registrator/v1/register": {
       "post": {
         "tags": [
           "Register"
