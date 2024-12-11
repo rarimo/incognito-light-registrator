@@ -14,10 +14,8 @@ type Config interface {
 	types.Copuser
 	comfig.Listenerer
 
-	IssuerConfiger
 	VerifierConfiger
-	NetworkConfiger
-	VaultConfiger
+	KeysConfiger
 }
 
 type config struct {
@@ -27,10 +25,8 @@ type config struct {
 	comfig.Listenerer
 	getter kv.Getter
 
-	IssuerConfiger
 	VerifierConfiger
-	NetworkConfiger
-	VaultConfiger
+	KeysConfiger
 }
 
 func New(getter kv.Getter) Config {
@@ -40,9 +36,7 @@ func New(getter kv.Getter) Config {
 		Copuser:          copus.NewCopuser(getter),
 		Listenerer:       comfig.NewListenerer(getter),
 		Logger:           comfig.NewLogger(getter, comfig.LoggerOpts{}),
-		IssuerConfiger:   NewIssuerConfiger(getter),
 		VerifierConfiger: NewVerifierConfiger(getter),
-		NetworkConfiger:  NewNetworkConfiger(getter),
-		VaultConfiger:    NewVaultConfiger(getter),
+		KeysConfiger:     NewKeysConfiger(getter),
 	}
 }
