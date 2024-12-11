@@ -45,31 +45,31 @@ func validateRegister(r resources.RegisterResponse) error {
 			})),
 		"/data/attributes/document_sod/dg15": validation.Validate(
 			r.Data.Attributes.DocumentSod.Dg15,
-			validation.Length(0, 512),
+			validation.Length(0, 32760),
 		),
 		"/data/attributes/document_sod/signed_attributes": validation.Validate(
 			r.Data.Attributes.DocumentSod.SignedAttributes,
 			validation.Required,
-			validation.Length(1, 512),
+			validation.Length(0, 65536),
 		),
 		"/data/attributes/document_sod/encapsulated_content": validation.Validate(
 			r.Data.Attributes.DocumentSod.EncapsulatedContent,
 			validation.Required,
-			validation.Length(1, 4096),
+			validation.Length(0, 65536),
 		),
 		"/data/attributes/document_sod/signature": validation.Validate(
 			r.Data.Attributes.DocumentSod.Signature,
 			validation.Required,
-			validation.Length(1, 4096),
+			validation.Length(0, 16384),
 		),
 		"/data/attributes/document_sod/aa_signature": validation.Validate(
 			r.Data.Attributes.DocumentSod.AaSignature,
-			validation.Length(0, 4096),
+			validation.Length(0, 16384),
 		),
 		"/data/attributes/document_sod/pem_file": validation.Validate(
 			r.Data.Attributes.DocumentSod.PemFile,
 			validation.Required,
-			validation.Length(1, 4096),
+			validation.Length(0, 65536),
 		),
 		"/data/attributes/zk_proof/proof": validation.Validate(
 			r.Data.Attributes.ZkProof.Proof,
