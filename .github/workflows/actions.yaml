@@ -27,7 +27,6 @@ jobs:
 
       - name: Run echo
         run: |
-          werf version
           docker version
           echo $GITHUB_REPOSITORY
           echo $GITHUB_SHA
