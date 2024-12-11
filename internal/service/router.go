@@ -23,7 +23,7 @@ func (s *service) router() chi.Router {
 	)
 	r.Route("/integrations/incognito-light-registrator", func(r chi.Router) {
 		r.Route("/v1", func(r chi.Router) {
-			r.Post("/verify-sod", handlers.Register)
+			r.Post("/register", handlers.Register)
 		})
 	})
 
