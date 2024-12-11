@@ -158,18 +158,9 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slaveSignatureHex, err := hex.DecodeString(truncateHexPrefix(req.Data.Attributes.DocumentSod.Signature))
+	slaveSignature, err := hex.DecodeString(truncateHexPrefix(req.Data.Attributes.DocumentSod.Signature))
 	if err != nil {
 		log.WithError(err).Error("failed to decode slaveSignature")
-		jsonError = problems.BadRequest(validation.Errors{
-			"slaveSignature": err,
-		})
-		return
-	}
-
-	var slaveSignature asn1.RawValue
-	if _, err := asn1.Unmarshal(slaveSignatureHex, &slaveSignature); err != nil {
-		log.WithError(err).Error("failed to unmarshal slaveSignature")
 		jsonError = problems.BadRequest(validation.Errors{
 			"slaveSignature": err,
 		})
@@ -204,7 +195,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = verifySod(signedAttributes, encapsulatedContent, slaveSignature.Bytes, cert, algorithmPair, cfg)
+	err = verifySod(signedAttributes, encapsulatedContent, slaveSignature, cert, algorithmPair, cfg)
 	if err != nil {
 		var sodError *types.SodError
 		errors2.As(err, &sodError)
@@ -255,12 +246,12 @@ func Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func verifySod(
-	signedAttributes []byte,
-	encapsulatedContent []byte,
-	signature []byte,
-	cert *x509.Certificate,
-	algorithmPair types.AlgorithmPair,
-	cfg *config.VerifierConfig,
+		signedAttributes []byte,
+		encapsulatedContent []byte,
+		signature []byte,
+		cert *x509.Certificate,
+		algorithmPair types.AlgorithmPair,
+		cfg *config.VerifierConfig,
 ) error {
 	if err := validateSignedAttributes(signedAttributes, encapsulatedContent, algorithmPair.HashAlgorithm); err != nil {
 		return &types.SodError{
@@ -309,9 +300,9 @@ func parseCertificate(pemFile []byte) (*x509.Certificate, error) {
 }
 
 func validateSignedAttributes(
-	signedAttributes,
-	encapsulatedContent []byte,
-	hashAlgorithm types.HashAlgorithm,
+		signedAttributes,
+		encapsulatedContent []byte,
+		hashAlgorithm types.HashAlgorithm,
 ) error {
 	signedAttributesASN1 := make([]asn1.RawValue, 0)
 
@@ -349,10 +340,10 @@ func validateSignedAttributes(
 }
 
 func verifySignature(
-	signature []byte,
-	cert *x509.Certificate,
-	signedAttributes []byte,
-	algorithmPair types.AlgorithmPair,
+		signature []byte,
+		cert *x509.Certificate,
+		signedAttributes []byte,
+		algorithmPair types.AlgorithmPair,
 ) error {
 	h := types.GeneralHash(algorithmPair.HashAlgorithm)
 	h.Write(signedAttributes)
