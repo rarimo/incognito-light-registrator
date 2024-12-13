@@ -10,10 +10,20 @@ type DigestAttribute struct {
 type EncapsulatedData struct {
 	Version             int
 	PrivateKeyAlgorithm asn1.RawValue
-	PrivateKey          asn1.RawValue
+	PrivateKey          []PrivateKeyElement
 }
 
 type PrivateKeyElement struct {
 	Integer  int
-	OctetStr asn1.RawValue
+	OctetStr asn1.RawContent
+}
+
+type AlgorithmIdentifier struct {
+	Algorithm  asn1.ObjectIdentifier
+	Parameters asn1.RawValue
+}
+
+type ECPublicKey struct {
+	Algorithm AlgorithmIdentifier
+	PublicKey asn1.BitString
 }

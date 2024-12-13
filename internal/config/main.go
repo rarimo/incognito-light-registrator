@@ -16,6 +16,7 @@ type Config interface {
 
 	VerifierConfiger
 	KeysConfiger
+	AddressesConfiger
 }
 
 type config struct {
@@ -27,16 +28,18 @@ type config struct {
 
 	VerifierConfiger
 	KeysConfiger
+	AddressesConfiger
 }
 
 func New(getter kv.Getter) Config {
 	return &config{
-		getter:           getter,
-		Databaser:        pgdb.NewDatabaser(getter),
-		Copuser:          copus.NewCopuser(getter),
-		Listenerer:       comfig.NewListenerer(getter),
-		Logger:           comfig.NewLogger(getter, comfig.LoggerOpts{}),
-		VerifierConfiger: NewVerifierConfiger(getter),
-		KeysConfiger:     NewKeysConfiger(getter),
+		getter:            getter,
+		Databaser:         pgdb.NewDatabaser(getter),
+		Copuser:           copus.NewCopuser(getter),
+		Listenerer:        comfig.NewListenerer(getter),
+		Logger:            comfig.NewLogger(getter, comfig.LoggerOpts{}),
+		VerifierConfiger:  NewVerifierConfiger(getter),
+		KeysConfiger:      NewKeysConfiger(getter),
+		AddressesConfiger: NewAddressesConfiger(getter),
 	}
 }

@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 
+	"github.com/rarimo/certificate-transparency-go/x509"
 	"github.com/rarimo/passport-identity-provider/internal/types"
 	"gitlab.com/distributed_lab/figure/v3"
 	"gitlab.com/distributed_lab/kit/comfig"
@@ -15,7 +16,7 @@ type VerifierConfiger interface {
 
 type VerifierConfig struct {
 	VerificationKeys  map[types.HashAlgorithm][]byte
-	MasterCerts       []byte
+	MasterCerts       *x509.CertPool
 	DisableTimeChecks bool
 	DisableNameChecks bool
 }
@@ -64,9 +65,12 @@ func (v *verifier) VerifierConfig() *VerifierConfig {
 			panic(err)
 		}
 
+		roots := x509.NewCertPool()
+		roots.AppendCertsFromPEM(masterCerts)
+
 		return &VerifierConfig{
 			VerificationKeys:  verificationKeys,
-			MasterCerts:       masterCerts,
+			MasterCerts:       roots,
 			DisableTimeChecks: newCfg.DisableTimeChecks,
 			DisableNameChecks: newCfg.DisableNameChecks,
 		}

@@ -7,19 +7,22 @@ import (
 	"crypto/sha256"
 	"encoding/asn1"
 	"encoding/hex"
-	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"math/big"
 	"net/http"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/google/jsonapi"
+	"github.com/iden3/go-iden3-crypto/keccak256"
 	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/iden3/go-rapidsnark/verifier"
 	errors2 "github.com/pkg/errors"
 	"github.com/rarimo/passport-identity-provider/internal/config"
 	"github.com/rarimo/passport-identity-provider/internal/data"
 	"github.com/rarimo/passport-identity-provider/internal/types"
+	"github.com/rarimo/passport-identity-provider/internal/utils"
+	"gitlab.com/distributed_lab/logan/v3"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 
@@ -29,18 +32,15 @@ import (
 	"github.com/rarimo/passport-identity-provider/resources"
 	"gitlab.com/distributed_lab/ape"
 	"gitlab.com/distributed_lab/ape/problems"
-	"gitlab.com/distributed_lab/logan/v3"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
-const (
-	DG1TruncateLength = 31
-)
-
 func Register(w http.ResponseWriter, r *http.Request) {
+	log := api.Log(r)
+
 	req, err := requests.NewRegisterRequest(r)
 	if err != nil {
-		api.Log(r).WithError(err).Error("failed to create new register request")
+		log.WithError(err).Error("failed to create new register request")
 		ape.RenderErr(w, problems.BadRequest(err)...)
 		return
 	}
@@ -53,21 +53,21 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	documentSOD := data.DocumentSOD{
 		HashAlgorigthm:      algorithmPair.HashAlgorithm,
 		SignatureAlgorithm:  algorithmPair.SignatureAlgorithm,
-		SignedAttributes:    truncateHexPrefix(req.Data.Attributes.DocumentSod.SignedAttributes),
-		EncapsulatedContent: truncateHexPrefix(req.Data.Attributes.DocumentSod.EncapsulatedContent),
-		Signature:           truncateHexPrefix(req.Data.Attributes.DocumentSod.Signature),
+		SignedAttributes:    utils.TruncateHexPrefix(req.Data.Attributes.DocumentSod.SignedAttributes),
+		EncapsulatedContent: utils.TruncateHexPrefix(req.Data.Attributes.DocumentSod.EncapsulatedContent),
+		Signature:           utils.TruncateHexPrefix(req.Data.Attributes.DocumentSod.Signature),
 		PemFile:             req.Data.Attributes.DocumentSod.PemFile,
 		ErrorKind:           nil,
 		Error:               nil,
 	}
 
-	if req.Data.Attributes.DocumentSod.AaSignature != nil {
-		truncatedAaSignature := truncateHexPrefix(*req.Data.Attributes.DocumentSod.AaSignature)
+	if req.Data.Attributes.DocumentSod.AaSignature != nil && *req.Data.Attributes.DocumentSod.AaSignature != "" {
+		truncatedAaSignature := utils.TruncateHexPrefix(*req.Data.Attributes.DocumentSod.AaSignature)
 		documentSOD.AaSignature = &truncatedAaSignature
 	}
 
-	if req.Data.Attributes.DocumentSod.Dg15 != nil {
-		truncatedDg15 := truncateHexPrefix(*req.Data.Attributes.DocumentSod.Dg15)
+	if req.Data.Attributes.DocumentSod.Dg15 != nil && *req.Data.Attributes.DocumentSod.Dg15 != "" {
+		truncatedDg15 := utils.TruncateHexPrefix(*req.Data.Attributes.DocumentSod.Dg15)
 		documentSOD.DG15 = &truncatedDg15
 	}
 
@@ -92,7 +92,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		documentSOD.Hash = hex.EncodeToString(resultHash.Sum(nil))
 
 		if _, err := api.DocumentSODQ(r).Upsert(documentSOD); err != nil {
-			api.Log(r).WithError(err).Error("failed to insert document SOD")
+			log.WithError(err).Error("failed to insert document SOD")
 			ape.RenderErr(w, problems.InternalError())
 			return
 		}
@@ -107,22 +107,11 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	rawReqData, err := json.Marshal(req.Data)
-	if err != nil {
-		api.Log(r).WithError(err).Error("failed to marshal register request")
-		jsonError = append(jsonError, problems.InternalError())
-		return
-	}
-	log := api.Log(r).WithFields(logan.F{
-		"user-agent":   r.Header.Get("User-Agent"),
-		"request_data": string(rawReqData),
-	})
-
-	cfg := api.VerifierConfig(r)
+	verifierCfg := api.VerifierConfig(r)
 
 	if err := verifier.VerifyGroth16(
 		req.Data.Attributes.ZkProof,
-		cfg.VerificationKeys[algorithmPair.HashAlgorithm],
+		verifierCfg.VerificationKeys[algorithmPair.HashAlgorithm],
 	); err != nil {
 		log.WithError(err).Error("failed to verify zk proof")
 		jsonError = problems.BadRequest(validation.Errors{
@@ -131,7 +120,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	signedAttributes, err := hex.DecodeString(truncateHexPrefix(req.Data.Attributes.DocumentSod.SignedAttributes))
+	signedAttributes, err := hex.DecodeString(utils.TruncateHexPrefix(documentSOD.SignedAttributes))
 	if err != nil {
 		log.WithError(err).Error("failed to decode signed attributes")
 		jsonError = problems.BadRequest(validation.Errors{
@@ -140,7 +129,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	encapsulatedContent, err := hex.DecodeString(truncateHexPrefix(req.Data.Attributes.DocumentSod.EncapsulatedContent))
+	encapsulatedContent, err := hex.DecodeString(utils.TruncateHexPrefix(documentSOD.EncapsulatedContent))
 	if err != nil {
 		log.WithError(err).Error("failed to decode encapsulated content")
 		jsonError = problems.BadRequest(validation.Errors{
@@ -149,7 +138,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cert, err := parseCertificate([]byte(req.Data.Attributes.DocumentSod.PemFile))
+	cert, err := parseCertificate([]byte(documentSOD.PemFile))
 	if err != nil {
 		log.WithError(err).Error("failed to parse certificate")
 		jsonError = problems.BadRequest(validation.Errors{
@@ -158,7 +147,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slaveSignature, err := hex.DecodeString(truncateHexPrefix(req.Data.Attributes.DocumentSod.Signature))
+	slaveSignature, err := hex.DecodeString(utils.TruncateHexPrefix(documentSOD.Signature))
 	if err != nil {
 		log.WithError(err).Error("failed to decode slaveSignature")
 		jsonError = problems.BadRequest(validation.Errors{
@@ -167,10 +156,18 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dg1, err := getDataGroup(encapsulatedContent, 0)
+	dg1Hash, err := utils.GetDataGroup(encapsulatedContent, 1)
 	if err != nil {
 		log.WithError(err).Error("failed to get data group")
 		jsonError = append(jsonError, problems.InternalError())
+		return
+	}
+
+	if dg1Hash == nil {
+		log.Error("data group 1 is missing")
+		jsonError = problems.BadRequest(validation.Errors{
+			"encapsulated_content": errors.New("data group 1 is missing"),
+		})
 		return
 	}
 
@@ -181,13 +178,13 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dg1Truncated := dg1
-	if len(dg1) > DG1TruncateLength {
-		// Since circuit is using DG1TruncateLength bytes of dg1, we need to truncate it to first DG1TruncateLength bytes
-		dg1Truncated = dg1[len(dg1)-DG1TruncateLength:]
+	dg1Truncated := dg1Hash
+	if len(dg1Hash) > types.DG1TruncateLength {
+		// Since circuit is using types.DG1TruncateLength bytes of dg1Hash, we need to truncate it to first types.DG1TruncateLength bytes
+		dg1Truncated = dg1Hash[len(dg1Hash)-types.DG1TruncateLength:]
 	}
 
-	if !bytes.Equal(dg1Truncated, proofDg1Decimal.FillBytes(make([]byte, DG1TruncateLength))) {
+	if !bytes.Equal(dg1Truncated, proofDg1Decimal.FillBytes(make([]byte, types.DG1TruncateLength))) {
 		log.Error("proof contains foreign data group 1")
 		jsonError = problems.BadRequest(validation.Errors{
 			"zk_proof": errors.New("proof contains foreign data group 1"),
@@ -195,7 +192,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = verifySod(signedAttributes, encapsulatedContent, slaveSignature, cert, algorithmPair, cfg)
+	err = verifySod(signedAttributes, encapsulatedContent, slaveSignature, cert, algorithmPair, verifierCfg)
 	if err != nil {
 		var sodError *types.SodError
 		errors2.As(err, &sodError)
@@ -211,25 +208,82 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	truncatedSignedAttributes, err := extractBits(signedAttributes, 252)
+	truncatedSignedAttributes, err := utils.ExtractBits(signedAttributes, 252)
 	if err != nil {
 		log.WithError(err).Error("failed to extract bits from signed attributes")
 		jsonError = append(jsonError, problems.InternalError())
 		return
 	}
 
-	documentHash, err := poseidon.HashBytes(truncatedSignedAttributes)
+	passportHash, err := poseidon.HashBytes(truncatedSignedAttributes)
 	if err != nil {
 		log.WithError(err).Error("failed to hash signed attributes")
 		jsonError = append(jsonError, problems.InternalError())
 		return
 	}
 
-	message := append(dg1, documentHash.Bytes()...)
-
-	signature, err := ecdsa.SignASN1(rand.Reader, api.KeysConfig(r).SignatureKey, message)
+	dg15Hash, err := utils.GetDataGroup(encapsulatedContent, 15)
 	if err != nil {
-		log.WithError(err).Error("failed to sign message")
+		log.WithError(err).Error("failed to get data group")
+		jsonError = append(jsonError, problems.InternalError())
+		return
+	}
+
+	var extractedDg15 []byte
+	if documentSOD.DG15 != nil {
+		extractedDg15, err = hex.DecodeString(utils.TruncateHexPrefix(*documentSOD.DG15))
+		if err != nil {
+			log.WithError(err).Error("failed to decode dg15Hash")
+			jsonError = append(jsonError, problems.InternalError())
+			return
+		}
+
+		extractedDg15Hash := types.GeneralHash(algorithmPair.HashAlgorithm)
+		extractedDg15Hash.Write(extractedDg15)
+
+		if !bytes.Equal(dg15Hash, extractedDg15Hash.Sum(nil)) {
+			log.Error("dg15Hash does not match")
+			jsonError = problems.BadRequest(validation.Errors{
+				"DG15": errors.New("dg15Hash does not match"),
+			})
+			return
+		}
+	}
+
+	_, passportPubkeyHash, err := utils.ExtractPublicKey(extractedDg15)
+	if err != nil {
+		log.WithError(err).Error("failed to extract public key")
+		jsonError = append(jsonError, problems.InternalError())
+		return
+	}
+
+	addressesCfg := api.AddressesConfig(r)
+	verifierContract, ok := addressesCfg.Verifiers[algorithmPair.HashAlgorithm]
+	if !ok {
+		log.Errorf("No verifier contract found for hash algorithm %s", algorithmPair.HashAlgorithm)
+		jsonError = append(jsonError, problems.InternalError())
+		return
+	}
+
+	dg1HashSlice := [32]byte{}
+	copy(dg1HashSlice[:], dg1Truncated)
+
+	signedData, err := utils.BuildSignedData(
+		addressesCfg.RegistrationContract,
+		verifierContract,
+		[32]byte(passportHash.Bytes()),
+		dg1HashSlice,
+		passportPubkeyHash,
+	)
+	if err != nil {
+		log.WithError(err).Error("failed to build signed data")
+		jsonError = append(jsonError, problems.InternalError())
+		return
+	}
+
+	signature, err := ecdsa.SignASN1(rand.Reader, api.KeysConfig(r).SignatureKey, keccak256.Hash(signedData))
+	if err != nil {
+		log.WithError(err).Error("failed to sign messageHash")
 		jsonError = append(jsonError, problems.InternalError())
 		return
 	}
@@ -238,20 +292,22 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		Data: resources.Signature{
 			Key: resources.NewKeyInt64(0, resources.SIGNATURE),
 			Attributes: resources.SignatureAttributes{
-				DocumentHash: hex.EncodeToString(documentHash.Bytes()),
-				Signature:    hex.EncodeToString(signature),
+				PassportHash: hexutil.Encode(passportHash.Bytes()),
+				PublicKey:    hexutil.Encode(passportPubkeyHash[:]),
+				Verifier:     *verifierContract,
+				Signature:    hexutil.Encode(signature),
 			},
 		},
 	}
 }
 
 func verifySod(
-		signedAttributes []byte,
-		encapsulatedContent []byte,
-		signature []byte,
-		cert *x509.Certificate,
-		algorithmPair types.AlgorithmPair,
-		cfg *config.VerifierConfig,
+	signedAttributes []byte,
+	encapsulatedContent []byte,
+	signature []byte,
+	cert *x509.Certificate,
+	algorithmPair types.AlgorithmPair,
+	cfg *config.VerifierConfig,
 ) error {
 	if err := validateSignedAttributes(signedAttributes, encapsulatedContent, algorithmPair.HashAlgorithm); err != nil {
 		return &types.SodError{
@@ -300,9 +356,9 @@ func parseCertificate(pemFile []byte) (*x509.Certificate, error) {
 }
 
 func validateSignedAttributes(
-		signedAttributes,
-		encapsulatedContent []byte,
-		hashAlgorithm types.HashAlgorithm,
+	signedAttributes,
+	encapsulatedContent []byte,
+	hashAlgorithm types.HashAlgorithm,
 ) error {
 	signedAttributesASN1 := make([]asn1.RawValue, 0)
 
@@ -340,10 +396,10 @@ func validateSignedAttributes(
 }
 
 func verifySignature(
-		signature []byte,
-		cert *x509.Certificate,
-		signedAttributes []byte,
-		algorithmPair types.AlgorithmPair,
+	signature []byte,
+	cert *x509.Certificate,
+	signedAttributes []byte,
+	algorithmPair types.AlgorithmPair,
 ) error {
 	h := types.GeneralHash(algorithmPair.HashAlgorithm)
 	h.Write(signedAttributes)
@@ -356,12 +412,9 @@ func verifySignature(
 	return nil
 }
 
-func validateCert(cert *x509.Certificate, masterCertsPem []byte, disableTimeChecks, disableNameChecks bool) error {
-	roots := x509.NewCertPool()
-	roots.AppendCertsFromPEM(masterCertsPem)
-
+func validateCert(cert *x509.Certificate, masterCerts *x509.CertPool, disableTimeChecks, disableNameChecks bool) error {
 	foundCerts, err := cert.Verify(x509.VerifyOptions{
-		Roots:             roots,
+		Roots:             masterCerts,
 		DisableTimeChecks: disableTimeChecks,
 		DisableNameChecks: disableNameChecks,
 	})
@@ -374,24 +427,6 @@ func validateCert(cert *x509.Certificate, masterCertsPem []byte, disableTimeChec
 	}
 
 	return nil
-}
-
-func extractBits(data []byte, numBits int) ([]byte, error) {
-	numBytes := (numBits + 7) / 8
-	if len(data) < numBytes {
-		return nil, fmt.Errorf("data is too short, requires at least %d bytes", numBytes)
-	}
-
-	result := make([]byte, numBytes)
-	copy(result, data[:numBytes])
-
-	remainingBits := numBits % 8
-	if remainingBits != 0 {
-		mask := byte(0xFF << (8 - remainingBits))
-		result[numBytes-1] &= mask
-	}
-
-	return result, nil
 }
 
 func mapResponse(errKind *types.DocumentSODErrorKind, err error) validation.Errors {
@@ -415,31 +450,4 @@ func mapResponse(errKind *types.DocumentSODErrorKind, err error) validation.Erro
 	default:
 		return nil
 	}
-}
-
-func getDataGroup(encapsulatedContent []byte, index int) ([]byte, error) {
-	encapsulatedData := types.EncapsulatedData{}
-	if _, err := asn1.Unmarshal(encapsulatedContent, &encapsulatedData); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal encapsulated data")
-	}
-
-	privateKey := make([]asn1.RawValue, 0)
-	if _, err := asn1.Unmarshal(encapsulatedData.PrivateKey.FullBytes, &privateKey); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal private key")
-	}
-
-	privKeyEl := types.PrivateKeyElement{}
-	if _, err := asn1.Unmarshal(privateKey[index].FullBytes, &privKeyEl); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal private key element")
-	}
-
-	return privKeyEl.OctetStr.Bytes, nil
-}
-
-func truncateHexPrefix(hexString string) string {
-	if len(hexString) > 2 && hexString[:2] == "0x" {
-		return hexString[2:]
-	}
-
-	return hexString
 }

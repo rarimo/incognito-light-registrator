@@ -19,6 +19,7 @@ func (s *service) router() chi.Router {
 			api.CtxVerifierConfig(s.cfg.VerifierConfig()),
 			api.CtxDocumentSODQ(data.NewDocumentSODQ(s.cfg.DB())),
 			api.CtxKeysConfig(s.cfg.KeysConfig()),
+			api.CtxAddressesConfig(s.cfg.AddressesConfig()),
 		),
 	)
 	r.Route("/integrations/incognito-light-registrator", func(r chi.Router) {

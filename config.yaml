@@ -9,6 +9,15 @@ verifier:
   disableTimeChecks: false
   disableNameChecks: false
 
+addresses:
+  registration_contract: 8B8b14B6bD955eCc96bee1D83a3Eba21B80A0E91
+  verifiers:
+    sha1: 50f07F4E66Cc7A09186120B6e0152602768923ac
+    sha224: b83D5fd8A498482b123EE1837B86B82CCd33240D
+    sha256: 91E3d9ef73afC08E083719e8CF052c1d810aF191
+    sha384: Abf2Fef1aF4ca7cB7EB3F4F2169D55C502E086aD
+    sha512: b7609357EAEA80C8a064Aa7B9Ff1D7E7b76fDB98
+
 log:
   level: debug
   disable_sentry: true

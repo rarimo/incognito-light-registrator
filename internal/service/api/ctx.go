@@ -16,6 +16,7 @@ const (
 	verifierConfigKey
 	documentSODQKey
 	keysConfigKey
+	addressesConfigKey
 )
 
 func CtxLog(entry *logan.Entry) func(context.Context) context.Context {
@@ -56,4 +57,14 @@ func CtxKeysConfig(entry config.KeysConfig) func(context.Context) context.Contex
 
 func KeysConfig(r *http.Request) config.KeysConfig {
 	return r.Context().Value(keysConfigKey).(config.KeysConfig)
+}
+
+func CtxAddressesConfig(entry config.AddressesConfig) func(context.Context) context.Context {
+	return func(ctx context.Context) context.Context {
+		return context.WithValue(ctx, addressesConfigKey, entry)
+	}
+}
+
+func AddressesConfig(r *http.Request) config.AddressesConfig {
+	return r.Context().Value(addressesConfigKey).(config.AddressesConfig)
 }
