@@ -176,13 +176,9 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dg1Truncated := dg1Hash
-	if len(dg1Hash) > types.DG1TruncateLength {
-		// Since circuit is using types.DG1TruncateLength bytes of dg1Hash, we need to truncate it to first types.DG1TruncateLength bytes
-		dg1Truncated = dg1Hash[len(dg1Hash)-types.DG1TruncateLength:]
-	}
+	dg1Truncated := utils.TruncateDg1Hash(dg1Hash)
 
-	if !bytes.Equal(dg1Truncated, proofDg1Decimal.FillBytes(make([]byte, types.DG1TruncateLength))) {
+	if !bytes.Equal(dg1Truncated[:], proofDg1Decimal.FillBytes(make([]byte, 32))) {
 		log.Error("proof contains foreign data group 1")
 		jsonError = problems.BadRequest(validation.Errors{
 			"zk_proof": errors.New("proof contains foreign data group 1"),
@@ -263,14 +259,11 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dg1HashSlice := [32]byte{}
-	copy(dg1HashSlice[:], dg1Truncated)
-
 	rawSignedData, err := utils.BuildSignedData(
 		addressesCfg.RegistrationContract,
 		verifierContract,
 		[32]byte(passportHash.Bytes()),
-		dg1HashSlice,
+		dg1Truncated,
 		passportPubkeyHash,
 	)
 	if err != nil {
@@ -304,12 +297,12 @@ func Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func verifySod(
-	signedAttributes []byte,
-	encapsulatedContent []byte,
-	signature []byte,
-	cert *x509.Certificate,
-	algorithmPair types.AlgorithmPair,
-	cfg *config.VerifierConfig,
+		signedAttributes []byte,
+		encapsulatedContent []byte,
+		signature []byte,
+		cert *x509.Certificate,
+		algorithmPair types.AlgorithmPair,
+		cfg *config.VerifierConfig,
 ) error {
 	if err := validateSignedAttributes(signedAttributes, encapsulatedContent, algorithmPair.HashAlgorithm); err != nil {
 		return &types.SodError{
@@ -358,9 +351,9 @@ func parseCertificate(pemFile []byte) (*x509.Certificate, error) {
 }
 
 func validateSignedAttributes(
-	signedAttributes,
-	encapsulatedContent []byte,
-	hashAlgorithm types.HashAlgorithm,
+		signedAttributes,
+		encapsulatedContent []byte,
+		hashAlgorithm types.HashAlgorithm,
 ) error {
 	signedAttributesASN1 := make([]asn1.RawValue, 0)
 
@@ -398,10 +391,10 @@ func validateSignedAttributes(
 }
 
 func verifySignature(
-	signature []byte,
-	cert *x509.Certificate,
-	signedAttributes []byte,
-	algorithmPair types.AlgorithmPair,
+		signature []byte,
+		cert *x509.Certificate,
+		signedAttributes []byte,
+		algorithmPair types.AlgorithmPair,
 ) error {
 	h := types.GeneralHash(algorithmPair.HashAlgorithm)
 	h.Write(signedAttributes)

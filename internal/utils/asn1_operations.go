@@ -134,6 +134,16 @@ func ToEthSignedMessageHash(data []byte) []byte {
 	return crypto.Keccak256(append(prefix, data...))
 }
 
+func TruncateDg1Hash(dg1Hash []byte) (dg1Truncated [32]byte) {
+	if len(dg1Hash) > types.DG1TruncateLength {
+		copy(dg1Truncated[1:], dg1Hash[len(dg1Hash)-types.DG1TruncateLength:])
+	}
+	copy(dg1Truncated[32-len(dg1Hash):], dg1Hash)
+	dg1Truncated[0] = 0x00
+
+	return dg1Truncated
+}
+
 func generalPublicKeyExtraction(dg15 []byte) (any, error) {
 	var rawDg15 asn1.RawValue
 	if _, err := asn1.Unmarshal(dg15, &rawDg15); err != nil {
