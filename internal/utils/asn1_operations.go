@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/rarimo/passport-identity-provider/internal/types"
@@ -62,44 +61,7 @@ func BuildSignedData(
 		contract, verifier *common.Address,
 		passportHash, dg1Hash, publicKey [32]byte,
 ) ([]byte, error) {
-	abiStruct, err := abi.NewType("tuple", "abi struct", []abi.ArgumentMarshaling{
-		{Name: "prefix", Type: "string"},
-		{Name: "address", Type: "address"},
-		{Name: "passportHash", Type: "bytes32"},
-		{Name: "dg1Hash", Type: "bytes32"},
-		{Name: "publicKey", Type: "bytes32"},
-		{Name: "verifier", Type: "address"},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	args := abi.Arguments{
-		{Type: abiStruct, Name: "message"},
-	}
-
-	message := struct {
-		Prefix       string
-		Address      common.Address
-		PassportHash [32]byte
-		Dg1Hash      [32]byte
-		PublicKey    [32]byte
-		Verifier     common.Address
-	}{
-		Prefix:       types.RegistrationSimplePrefix,
-		Address:      *contract,
-		PassportHash: passportHash,
-		Dg1Hash:      dg1Hash,
-		PublicKey:    publicKey,
-		Verifier:     *verifier,
-	}
-
-	encoded, err := args.Pack(message)
-	if err != nil {
-		return nil, err
-	}
-
-	return encoded, nil
+	return abiEncodePacked(types.RegistrationSimplePrefix, contract, passportHash[:], dg1Hash[:], publicKey[:], verifier)
 }
 
 func ExtractPublicKey(dg15 []byte) (interface{}, [32]byte, error) {
@@ -340,4 +302,29 @@ func fixRSAPublicKeyEncoding(der []byte) ([]byte, error) {
 	}
 
 	return newDer, nil
+}
+
+func abiEncodePacked(args ...interface{}) ([]byte, error) {
+	encoded := make([]byte, 0)
+	for _, arg := range args {
+		switch val := arg.(type) {
+		case string:
+			encoded = append(encoded, common.LeftPadBytes([]byte(val), 32)...)
+		case *big.Int:
+			encoded = append(encoded, common.LeftPadBytes(val.Bytes(), 32)...)
+		case bool:
+			if val {
+				encoded = append(encoded, []byte{0x0, 0x1}...)
+			}
+		case common.Hash:
+			encoded = append(encoded, val[:]...)
+		case []byte:
+			encoded = append(encoded, val...)
+		case *common.Address:
+			encoded = append(encoded, val[:]...)
+		default:
+			return nil, fmt.Errorf("unsupported type %T", arg)
+		}
+	}
+	return encoded, nil
 }
