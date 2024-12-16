@@ -279,7 +279,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	signature, err := crypto.Sign(utils.ToEthSignedMessageHash(signedData), api.KeysConfig(r).SignatureKey)
+	signature, err := crypto.Sign(utils.ToEthSignedMessageHash(crypto.Keccak256(signedData)), api.KeysConfig(r).SignatureKey)
 	if err != nil {
 		log.WithError(err).Error("failed to sign messageHash")
 		jsonError = append(jsonError, problems.InternalError())
