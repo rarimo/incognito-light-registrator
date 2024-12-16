@@ -59,8 +59,8 @@ func TruncateHexPrefix(hexString string) string {
 }
 
 func BuildSignedData(
-		contract, verifier *common.Address,
-		passportHash, dg1Hash, publicKey [32]byte,
+	contract, verifier *common.Address,
+	passportHash, dg1Hash, publicKey [32]byte,
 ) ([]byte, error) {
 	return abiEncodePacked(types.RegistrationSimplePrefix, contract, passportHash[:], dg1Hash[:], publicKey[:], verifier)
 }

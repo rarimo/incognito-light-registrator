@@ -75,5 +75,9 @@ func validateRegister(r resources.RegisterResponse) error {
 			r.Data.Attributes.ZkProof.Proof,
 			validation.Required,
 		),
+		"/data/attributes/document_sod/sod": validation.Validate(
+			r.Data.Attributes.DocumentSod.Sod,
+			validation.Length(0, 262144),
+		),
 	}.Filter()
 }

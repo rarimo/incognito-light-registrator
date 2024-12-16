@@ -69,21 +69,36 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		documentSOD.DG15 = &truncatedDg15
 	}
 
+	if req.Data.Attributes.DocumentSod.Sod != nil && *req.Data.Attributes.DocumentSod.Sod != "" {
+		truncatedSod := utils.TruncateHexPrefix(*req.Data.Attributes.DocumentSod.Sod)
+		documentSOD.RawSOD = &truncatedSod
+	}
+
 	var response *resources.SignatureResponse
 	var jsonError []*jsonapi.ErrorObject
 
 	defer func() {
-		// SHA256 hash used for unique constraint reserved for expansion, since postgresql has index limit
+		// SHA256 hash used for unique constraint reserved for expansion, since postgresql has index limit. We'll add
+		// every field, that participates in proof verification, to the hash, so we can detect if changes of crucial
+		// fields lead to different results.
+		//
+		// For now, if logic expands, we can add more fields to the hash without versioning it, since if there is new
+		// field, that participates in proof verification, we want to store the whole document SOD again. Possibly,
+		// storage management could be optimized by adding hash versioning and basic data checks through all versions.
 		resultHash := sha256.New()
 
 		message := fmt.Sprintf(
-			"%s%s%s%s%s",
+			"%s%s%s%s%s%s",
 			documentSOD.HashAlgorigthm, documentSOD.SignatureAlgorithm, documentSOD.SignedAttributes,
-			documentSOD.EncapsulatedContent, documentSOD.Signature,
+			documentSOD.EncapsulatedContent, documentSOD.Signature, documentSOD.PemFile,
 		)
 
 		if documentSOD.Error != nil {
 			message += fmt.Sprintf("%s%s", documentSOD.ErrorKind, *documentSOD.Error)
+		}
+
+		if documentSOD.DG15 != nil {
+			message += *documentSOD.DG15
 		}
 
 		resultHash.Write([]byte(message))
@@ -297,12 +312,12 @@ func Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func verifySod(
-		signedAttributes []byte,
-		encapsulatedContent []byte,
-		signature []byte,
-		cert *x509.Certificate,
-		algorithmPair types.AlgorithmPair,
-		cfg *config.VerifierConfig,
+	signedAttributes []byte,
+	encapsulatedContent []byte,
+	signature []byte,
+	cert *x509.Certificate,
+	algorithmPair types.AlgorithmPair,
+	cfg *config.VerifierConfig,
 ) error {
 	if err := validateSignedAttributes(signedAttributes, encapsulatedContent, algorithmPair.HashAlgorithm); err != nil {
 		return &types.SodError{
@@ -351,9 +366,9 @@ func parseCertificate(pemFile []byte) (*x509.Certificate, error) {
 }
 
 func validateSignedAttributes(
-		signedAttributes,
-		encapsulatedContent []byte,
-		hashAlgorithm types.HashAlgorithm,
+	signedAttributes,
+	encapsulatedContent []byte,
+	hashAlgorithm types.HashAlgorithm,
 ) error {
 	signedAttributesASN1 := make([]asn1.RawValue, 0)
 
@@ -391,10 +406,10 @@ func validateSignedAttributes(
 }
 
 func verifySignature(
-		signature []byte,
-		cert *x509.Certificate,
-		signedAttributes []byte,
-		algorithmPair types.AlgorithmPair,
+	signature []byte,
+	cert *x509.Certificate,
+	signedAttributes []byte,
+	algorithmPair types.AlgorithmPair,
 ) error {
 	h := types.GeneralHash(algorithmPair.HashAlgorithm)
 	h.Write(signedAttributes)

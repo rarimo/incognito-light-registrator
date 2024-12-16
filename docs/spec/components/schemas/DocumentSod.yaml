@@ -31,6 +31,9 @@ properties:
   dg15:
     type: string
     description: The Data Group 15, hex string
+  sod:
+    type: string
+    description: The document SOD, hex string
 
 
 

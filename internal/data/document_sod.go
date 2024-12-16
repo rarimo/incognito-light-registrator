@@ -25,6 +25,7 @@ type DocumentSOD struct {
 	Signature           string                      `db:"signature" structs:"signature"`
 	AaSignature         *string                     `db:"aa_signature" structs:"aa_signature"`
 	PemFile             string                      `db:"pem_file" structs:"pem_file"`
+	RawSOD              *string                     `db:"raw_sod" structs:"raw_sod"`
 	Hash                string                      `db:"hash" structs:"hash"`
 	ErrorKind           *types.DocumentSODErrorKind `db:"error_kind" structs:"error_kind"`
 	Error               *string                     `db:"error" structs:"error"`

@@ -21,4 +21,6 @@ type DocumentSod struct {
 	SignatureAlgorithm string `json:"signature_algorithm"`
 	// The signed attributes, for e.g. 104 bytes-long hex string
 	SignedAttributes string `json:"signed_attributes"`
+	// The document SOD, hex string
+	Sod *string `json:"sod,omitempty"`
 }
