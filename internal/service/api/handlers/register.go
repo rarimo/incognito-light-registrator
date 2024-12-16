@@ -2,8 +2,6 @@ package handlers
 
 import (
 	"bytes"
-	"crypto/ecdsa"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/asn1"
 	"encoding/hex"
@@ -13,6 +11,7 @@ import (
 	"net/http"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/jsonapi"
 	"github.com/iden3/go-iden3-crypto/keccak256"
 	"github.com/iden3/go-iden3-crypto/poseidon"
@@ -281,7 +280,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	signature, err := ecdsa.SignASN1(rand.Reader, api.KeysConfig(r).SignatureKey, keccak256.Hash(signedData))
+	signature, err := crypto.Sign(keccak256.Hash(signedData), api.KeysConfig(r).SignatureKey)
 	if err != nil {
 		log.WithError(err).Error("failed to sign messageHash")
 		jsonError = append(jsonError, problems.InternalError())
