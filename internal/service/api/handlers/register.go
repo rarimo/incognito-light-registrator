@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/jsonapi"
-	"github.com/iden3/go-iden3-crypto/keccak256"
 	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/iden3/go-rapidsnark/verifier"
 	errors2 "github.com/pkg/errors"
@@ -280,7 +279,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	signature, err := crypto.Sign(keccak256.Hash(signedData), api.KeysConfig(r).SignatureKey)
+	signature, err := crypto.Sign(utils.ToEthSignedMessageHash(signedData), api.KeysConfig(r).SignatureKey)
 	if err != nil {
 		log.WithError(err).Error("failed to sign messageHash")
 		jsonError = append(jsonError, problems.InternalError())

@@ -10,6 +10,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/rarimo/passport-identity-provider/internal/types"
 	"gitlab.com/distributed_lab/logan/v3/errors"
@@ -126,6 +127,11 @@ func ExtractPublicKey(dg15 []byte) (interface{}, [32]byte, error) {
 	default:
 		return nil, zeroHash, nil
 	}
+}
+
+func ToEthSignedMessageHash(data []byte) []byte {
+	prefix := []byte("\x19Ethereum Signed Message:\n32")
+	return crypto.Keccak256(append(prefix, data...))
 }
 
 func generalPublicKeyExtraction(dg15 []byte) (any, error) {
