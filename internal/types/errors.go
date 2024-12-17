@@ -19,19 +19,34 @@ const (
 	SigVerifyErr
 )
 
+var errorKindStrings = map[DocumentSODErrorKind]string{
+	SAValidateErr:      "Signature Algorithm validation error",
+	PEMFileParseErr:    "PEM file parse error",
+	PEMFileValidateErr: "PEM file validation error",
+	PEMFilePubKeyErr:   "PEM file public key error",
+	SigVerifyErr:       "Signature verification error",
+}
+
+var errorKindFields = map[DocumentSODErrorKind]string{
+	SAValidateErr:      "/data/attributes/document_sod/signed_attributes",
+	PEMFileParseErr:    "/data/attributes/document_sod/pem_file",
+	PEMFileValidateErr: "/data/attributes/document_sod/pem_file",
+	PEMFilePubKeyErr:   "/data/attributes/document_sod/pem_file",
+	SigVerifyErr:       "/data/attributes/document_sod/signature",
+}
+
 func (e DocumentSODErrorKind) String() string {
-	switch e {
-	case SAValidateErr:
-		return "Signature Algorithm validation error"
-	case PEMFileParseErr:
-		return "PEM file parse error"
-	case PEMFileValidateErr:
-		return "PEM file validation error"
-	case SigVerifyErr:
-		return "Signature verification error"
-	default:
-		return "Unknown"
+	if msg, ok := errorKindStrings[e]; ok {
+		return msg
 	}
+	return "Unknown"
+}
+
+func (e DocumentSODErrorKind) Field() string {
+	if field, ok := errorKindFields[e]; ok {
+		return field
+	}
+	return "/"
 }
 
 func (e DocumentSODErrorKind) Ptr() *DocumentSODErrorKind {
@@ -39,25 +54,36 @@ func (e DocumentSODErrorKind) Ptr() *DocumentSODErrorKind {
 }
 
 type SodError struct {
-	Kind    *DocumentSODErrorKind
-	Message error
+	Details      *SodErrorDetails
+	VerboseError error
+}
+
+type SodErrorDetails struct {
+	Kind        DocumentSODErrorKind `json:"kind"`
+	Description error                `json:"description"`
 }
 
 func (e *SodError) Error() string {
-	return fmt.Sprintf("%s: %s", e.Kind, e.Message)
+	if e.Details == nil {
+		return e.VerboseError.Error()
+	}
+
+	return fmt.Sprintf("%s: %s", e.Details.Kind.String(), e.Details.Description)
 }
 
-func (e *SodError) GetOptionalMessage() *string {
-	if e.Message != nil {
-		msg := e.Message.Error()
-		return &msg
+func (e *SodError) KindPtr() *DocumentSODErrorKind {
+	if e.Details == nil {
+		return nil
 	}
-	return nil
+
+	return e.Details.Kind.Ptr()
 }
 
-func (e *SodError) GetOptionalKind() *DocumentSODErrorKind {
-	if e.Kind != nil {
-		return e.Kind
+func (e *SodError) VerboseErrorPtr() *string {
+	if e.VerboseError == nil {
+		return nil
 	}
-	return nil
+
+	verboseError := e.VerboseError.Error()
+	return &verboseError
 }

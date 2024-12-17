@@ -16,7 +16,7 @@ import (
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
-func ExtractBits(data []byte, numBits int) ([]byte, error) {
+func ConvertBitsToBytes(data []byte, numBits int) ([]byte, error) {
 	numBytes := (numBits + 7) / 8
 	if len(data) < numBytes {
 		return nil, fmt.Errorf("data is too short, requires at least %d bytes", numBytes)
@@ -130,7 +130,7 @@ func ExtractPublicKey(dg15 []byte) (interface{}, [32]byte, error) {
 }
 
 func ToEthSignedMessageHash(data []byte) []byte {
-	prefix := []byte("\x19Ethereum Signed Message:\n32")
+	prefix := []byte("\x19Ethereum Signed Description:\n32")
 	return crypto.Keccak256(append(prefix, data...))
 }
 

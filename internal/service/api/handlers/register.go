@@ -106,7 +106,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 		if _, err := api.DocumentSODQ(r).Upsert(documentSOD); err != nil {
 			log.WithError(err).Error("failed to insert document SOD")
-			ape.RenderErr(w, problems.InternalError())
+			jsonError = append(jsonError, problems.InternalError())
 			return
 		}
 
@@ -171,8 +171,10 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 	dg1Hash, err := utils.GetDataGroup(encapsulatedContent, 1)
 	if err != nil {
-		log.WithError(err).Error("failed to get data group")
-		jsonError = append(jsonError, problems.InternalError())
+		log.WithError(err).Error("failed to get data group 1")
+		jsonError = append(jsonError, problems.BadRequest(validation.Errors{
+			"encapsulated_content": errors.New("failed to get data group 1"),
+		})...)
 		return
 	}
 
@@ -191,8 +193,14 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dg1Truncated := utils.TruncateDg1Hash(dg1Hash)
+	proofDg1Commitment, ok := big.NewInt(0).SetString(req.Data.Attributes.ZkProof.PubSignals[0], 10)
+	if !ok {
+		log.Error("failed to convert proofDg1Commitment to big.Int")
+		jsonError = append(jsonError, problems.InternalError())
+		return
+	}
 
+	dg1Truncated := utils.TruncateDg1Hash(dg1Hash)
 	if !bytes.Equal(dg1Truncated[:], proofDg1Decimal.FillBytes(make([]byte, 32))) {
 		log.Error("proof contains foreign data group 1")
 		jsonError = problems.BadRequest(validation.Errors{
@@ -203,21 +211,30 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 	err = verifySod(signedAttributes, encapsulatedContent, slaveSignature, cert, algorithmPair, verifierCfg)
 	if err != nil {
-		var sodError *types.SodError
-		errors2.As(err, &sodError)
+		sodError := new(types.SodError)
+		if !errors2.As(err, &sodError) {
+			log.WithError(err).Error("failed to verify SOD")
+			jsonError = append(jsonError, problems.InternalError())
+			return
+		}
 
 		log.WithError(err).Error("failed to verify SOD")
 
-		documentSOD.ErrorKind = sodError.GetOptionalKind()
-		documentSOD.Error = sodError.GetOptionalMessage()
+		documentSOD.ErrorKind = sodError.KindPtr()
+		documentSOD.Error = sodError.VerboseErrorPtr()
 
-		if resp := mapResponse(sodError.Kind, sodError.Message); resp != nil {
-			jsonError = problems.BadRequest(resp)
+		if sodError.Details == nil {
+			jsonError = append(jsonError, problems.InternalError())
 			return
 		}
+
+		jsonError = problems.BadRequest(validation.Errors{
+			sodError.Details.Kind.Field(): sodError.Details.Description,
+		})
+		return
 	}
 
-	truncatedSignedAttributes, err := utils.ExtractBits(signedAttributes, 252)
+	truncatedSignedAttributes, err := utils.ConvertBitsToBytes(signedAttributes, 252)
 	if err != nil {
 		log.WithError(err).Error("failed to extract bits from signed attributes")
 		jsonError = append(jsonError, problems.InternalError())
@@ -233,8 +250,10 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 	dg15Hash, err := utils.GetDataGroup(encapsulatedContent, 15)
 	if err != nil {
-		log.WithError(err).Error("failed to get data group")
-		jsonError = append(jsonError, problems.InternalError())
+		log.WithError(err).Error("failed to get data group 15")
+		jsonError = append(jsonError, problems.BadRequest(validation.Errors{
+			"encapsulated_content": errors.New("failed to get data group 15"),
+		})...)
 		return
 	}
 
@@ -277,8 +296,8 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	rawSignedData, err := utils.BuildSignedData(
 		addressesCfg.RegistrationContract,
 		verifierContract,
-		[32]byte(passportHash.Bytes()),
-		dg1Truncated,
+		[32]byte(passportHash.FillBytes(make([]byte, 32))),
+		[32]byte(proofDg1Commitment.FillBytes(make([]byte, 32))),
 		passportPubkeyHash,
 	)
 	if err != nil {
@@ -312,17 +331,20 @@ func Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func verifySod(
-	signedAttributes []byte,
-	encapsulatedContent []byte,
-	signature []byte,
-	cert *x509.Certificate,
-	algorithmPair types.AlgorithmPair,
-	cfg *config.VerifierConfig,
+		signedAttributes []byte,
+		encapsulatedContent []byte,
+		signature []byte,
+		cert *x509.Certificate,
+		algorithmPair types.AlgorithmPair,
+		cfg *config.VerifierConfig,
 ) error {
 	if err := validateSignedAttributes(signedAttributes, encapsulatedContent, algorithmPair.HashAlgorithm); err != nil {
 		return &types.SodError{
-			Kind:    types.SAValidateErr.Ptr(),
-			Message: err,
+			VerboseError: err,
+			Details: &types.SodErrorDetails{
+				Kind:        types.SAValidateErr,
+				Description: errors.New("failed to validate signed attributes"),
+			},
 		}
 	}
 
@@ -330,21 +352,30 @@ func verifySod(
 		unwrappedErr := errors2.Unwrap(err)
 		if errors2.Is(unwrappedErr, types.ErrInvalidPublicKey{}) {
 			return &types.SodError{
-				Kind:    types.PEMFilePubKeyErr.Ptr(),
-				Message: err,
+				VerboseError: err,
+				Details: &types.SodErrorDetails{
+					Kind:        types.PEMFilePubKeyErr,
+					Description: errors.New("failed to verify signature"),
+				},
 			}
 		}
 
 		return &types.SodError{
-			Kind:    types.SigVerifyErr.Ptr(),
-			Message: err,
+			VerboseError: err,
+			Details: &types.SodErrorDetails{
+				Kind:        types.SigVerifyErr,
+				Description: errors.New("failed to verify signature"),
+			},
 		}
 	}
 
 	if err := validateCert(cert, cfg.MasterCerts, cfg.DisableTimeChecks, cfg.DisableNameChecks); err != nil {
 		return &types.SodError{
-			Kind:    types.PEMFileValidateErr.Ptr(),
-			Message: err,
+			VerboseError: err,
+			Details: &types.SodErrorDetails{
+				Kind:        types.PEMFileValidateErr,
+				Description: errors.New("failed to validate certificate"),
+			},
 		}
 	}
 
@@ -366,9 +397,9 @@ func parseCertificate(pemFile []byte) (*x509.Certificate, error) {
 }
 
 func validateSignedAttributes(
-	signedAttributes,
-	encapsulatedContent []byte,
-	hashAlgorithm types.HashAlgorithm,
+		signedAttributes,
+		encapsulatedContent []byte,
+		hashAlgorithm types.HashAlgorithm,
 ) error {
 	signedAttributesASN1 := make([]asn1.RawValue, 0)
 
@@ -406,10 +437,10 @@ func validateSignedAttributes(
 }
 
 func verifySignature(
-	signature []byte,
-	cert *x509.Certificate,
-	signedAttributes []byte,
-	algorithmPair types.AlgorithmPair,
+		signature []byte,
+		cert *x509.Certificate,
+		signedAttributes []byte,
+		algorithmPair types.AlgorithmPair,
 ) error {
 	h := types.GeneralHash(algorithmPair.HashAlgorithm)
 	h.Write(signedAttributes)
@@ -437,27 +468,4 @@ func validateCert(cert *x509.Certificate, masterCerts *x509.CertPool, disableTim
 	}
 
 	return nil
-}
-
-func mapResponse(errKind *types.DocumentSODErrorKind, err error) validation.Errors {
-	if errKind == nil {
-		return nil
-	}
-
-	switch *errKind {
-	case types.SAValidateErr:
-		return validation.Errors{
-			"signed_attributes": err,
-		}
-	case types.PEMFileValidateErr, types.PEMFileParseErr, types.PEMFilePubKeyErr:
-		return validation.Errors{
-			"pem_file": err,
-		}
-	case types.SigVerifyErr:
-		return validation.Errors{
-			"signature": err,
-		}
-	default:
-		return nil
-	}
 }
