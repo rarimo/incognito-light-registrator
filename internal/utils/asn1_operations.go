@@ -130,7 +130,7 @@ func ExtractPublicKey(dg15 []byte) (interface{}, [32]byte, error) {
 }
 
 func ToEthSignedMessageHash(data []byte) []byte {
-	prefix := []byte("\x19Ethereum Signed Description:\n32")
+	prefix := []byte(types.EthSignedMessagePrefix)
 	return crypto.Keccak256(append(prefix, data...))
 }
 
