@@ -193,7 +193,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	proofDg1Commitment, ok := big.NewInt(0).SetString(req.Data.Attributes.ZkProof.PubSignals[0], 10)
+	proofDg1Commitment, ok := big.NewInt(0).SetString(req.Data.Attributes.ZkProof.PubSignals[1], 10)
 	if !ok {
 		log.Error("failed to convert proofDg1Commitment to big.Int")
 		jsonError = append(jsonError, problems.InternalError())

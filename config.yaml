@@ -10,7 +10,7 @@ verifier:
   disableNameChecks: false
 
 addresses:
-  registration_contract: 8B8b14B6bD955eCc96bee1D83a3Eba21B80A0E91
+  registration_contract: a2e2Cbbd0BAa74FE1bb4b61B12D420072806FFe0
   verifiers:
     sha1: 50f07F4E66Cc7A09186120B6e0152602768923ac
     sha224: b83D5fd8A498482b123EE1837B86B82CCd33240D
