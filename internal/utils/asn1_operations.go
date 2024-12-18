@@ -135,12 +135,14 @@ func ToEthSignedMessageHash(data []byte) []byte {
 }
 
 func TruncateDg1Hash(dg1Hash []byte) (dg1Truncated [32]byte) {
+	truncateStart := types.DG1TruncateLength - len(dg1Hash)
+	dg1HashStart := 0
 	if len(dg1Hash) > types.DG1TruncateLength {
-		copy(dg1Truncated[1:], dg1Hash[len(dg1Hash)-types.DG1TruncateLength:])
+		dg1HashStart = len(dg1Hash) - types.DG1TruncateLength
+		truncateStart = 1
 	}
-	copy(dg1Truncated[32-len(dg1Hash):], dg1Hash)
-	dg1Truncated[0] = 0x00
 
+	copy(dg1Truncated[truncateStart:], dg1Hash[dg1HashStart:])
 	return dg1Truncated
 }
 

@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/jsonapi"
 	"github.com/iden3/go-iden3-crypto/poseidon"
-	"github.com/iden3/go-rapidsnark/verifier"
 	errors2 "github.com/pkg/errors"
 	"github.com/rarimo/passport-identity-provider/internal/config"
 	"github.com/rarimo/passport-identity-provider/internal/data"
@@ -122,16 +121,16 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 	verifierCfg := api.VerifierConfig(r)
 
-	if err := verifier.VerifyGroth16(
-		req.Data.Attributes.ZkProof,
-		verifierCfg.VerificationKeys[algorithmPair.HashAlgorithm],
-	); err != nil {
-		log.WithError(err).Error("failed to verify zk proof")
-		jsonError = problems.BadRequest(validation.Errors{
-			"zk_proof": err,
-		})
-		return
-	}
+	//if err := verifier.VerifyGroth16(
+	//	req.Data.Attributes.ZkProof,
+	//	verifierCfg.VerificationKeys[algorithmPair.HashAlgorithm],
+	//); err != nil {
+	//	log.WithError(err).Error("failed to verify zk proof")
+	//	jsonError = problems.BadRequest(validation.Errors{
+	//		"zk_proof": err,
+	//	})
+	//	return
+	//}
 
 	signedAttributes, err := hex.DecodeString(utils.TruncateHexPrefix(documentSOD.SignedAttributes))
 	if err != nil {
