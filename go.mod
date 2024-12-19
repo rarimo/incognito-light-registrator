@@ -13,6 +13,7 @@ require (
 	github.com/hashicorp/vault/api v1.15.0
 	github.com/iden3/go-iden3-crypto v0.0.17
 	github.com/iden3/go-rapidsnark/types v0.0.3
+	github.com/iden3/go-rapidsnark/verifier v0.0.5
 	github.com/pkg/errors v0.9.1
 	github.com/rarimo/certificate-transparency-go v0.0.0-20240305114501-050b1f19639a
 	github.com/rubenv/sql-migrate v1.6.1

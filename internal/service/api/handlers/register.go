@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/jsonapi"
 	"github.com/iden3/go-iden3-crypto/poseidon"
+	"github.com/iden3/go-rapidsnark/verifier"
 	errors2 "github.com/pkg/errors"
 	"github.com/rarimo/passport-identity-provider/internal/config"
 	"github.com/rarimo/passport-identity-provider/internal/data"
