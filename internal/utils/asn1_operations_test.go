@@ -15,10 +15,10 @@ func TestTruncateDg1Hash(t *testing.T) {
 	}{
 		{
 			name:      "16-byte hash",
-			inputHash: bytes.Repeat([]byte{0xDD}, 16), // Example: 128 bytes of 0xDD
+			inputHash: bytes.Repeat([]byte{0xDD}, 16), // Example: 16 bytes of 0xDD
 			expected: func() [32]byte {
 				var result [32]byte
-				copy(result[32-16:], bytes.Repeat([]byte{0xDD}, 16)) // First 32 bytes
+				copy(result[32-16:], bytes.Repeat([]byte{0xDD}, 32))
 				return result
 			}(),
 		},
@@ -27,7 +27,7 @@ func TestTruncateDg1Hash(t *testing.T) {
 			inputHash: bytes.Repeat([]byte{0xAA}, 20), // Example: 20 bytes of 0xAA
 			expected: func() [32]byte {
 				var result [32]byte
-				copy(result[32-20:], bytes.Repeat([]byte{0xAA}, 20))
+				copy(result[32-20:], bytes.Repeat([]byte{0xAA}, 32))
 				return result
 			}(),
 		},
@@ -36,7 +36,16 @@ func TestTruncateDg1Hash(t *testing.T) {
 			inputHash: bytes.Repeat([]byte{0xBB}, 32), // Example: 32 bytes of 0xBB
 			expected: func() [32]byte {
 				var result [32]byte
-				copy(result[1:], bytes.Repeat([]byte{0xBB}, 31))
+				copy(result[1:], bytes.Repeat([]byte{0xBB}, 32))
+				return result
+			}(),
+		},
+		{
+			name:      "48-byte hash",
+			inputHash: bytes.Repeat([]byte{0xBB}, 48), // Example: 48 bytes of 0xBB
+			expected: func() [32]byte {
+				var result [32]byte
+				copy(result[1:], bytes.Repeat([]byte{0xBB}, 32))
 				return result
 			}(),
 		},
@@ -45,7 +54,7 @@ func TestTruncateDg1Hash(t *testing.T) {
 			inputHash: bytes.Repeat([]byte{0xCC}, 64), // Example: 64 bytes of 0xCC
 			expected: func() [32]byte {
 				var result [32]byte
-				copy(result[1:], bytes.Repeat([]byte{0xCC}, 32)) // Last 31 bytes
+				copy(result[1:], bytes.Repeat([]byte{0xCC}, 32))
 				return result
 			}(),
 		},
@@ -54,7 +63,7 @@ func TestTruncateDg1Hash(t *testing.T) {
 			inputHash: bytes.Repeat([]byte{0xCC}, 128), // Example: 128 bytes of 0xCC (I don't know if this even possible, but just in case)
 			expected: func() [32]byte {
 				var result [32]byte
-				copy(result[1:], bytes.Repeat([]byte{0xCC}, 32)) // Last 31 bytes
+				copy(result[1:], bytes.Repeat([]byte{0xCC}, 32))
 				return result
 			}(),
 		},
