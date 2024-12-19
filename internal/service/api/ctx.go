@@ -4,12 +4,8 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/ethereum/go-ethereum/ethclient"
-	stateabi "github.com/iden3/contracts-abi/state/go/abi"
 	"github.com/rarimo/passport-identity-provider/internal/config"
 	"github.com/rarimo/passport-identity-provider/internal/data"
-	"github.com/rarimo/passport-identity-provider/internal/service/issuer"
-	"github.com/rarimo/passport-identity-provider/internal/service/vault"
 	"gitlab.com/distributed_lab/logan/v3"
 )
 
@@ -17,12 +13,10 @@ type ctxKey int
 
 const (
 	logCtxKey ctxKey = iota
-	masterQKey
 	verifierConfigKey
-	stateContractKey
-	issuerCtxKey
-	vaultClientCtxKey
-	ethClientCtxKey
+	documentSODQKey
+	keysConfigKey
+	addressesConfigKey
 )
 
 func CtxLog(entry *logan.Entry) func(context.Context) context.Context {
@@ -35,16 +29,6 @@ func Log(r *http.Request) *logan.Entry {
 	return r.Context().Value(logCtxKey).(*logan.Entry)
 }
 
-func CtxMasterQ(entry data.MasterQ) func(context.Context) context.Context {
-	return func(ctx context.Context) context.Context {
-		return context.WithValue(ctx, masterQKey, entry)
-	}
-}
-
-func MasterQ(r *http.Request) data.MasterQ {
-	return r.Context().Value(masterQKey).(data.MasterQ).New()
-}
-
 func CtxVerifierConfig(entry *config.VerifierConfig) func(context.Context) context.Context {
 	return func(ctx context.Context) context.Context {
 		return context.WithValue(ctx, verifierConfigKey, entry)
@@ -55,42 +39,32 @@ func VerifierConfig(r *http.Request) *config.VerifierConfig {
 	return r.Context().Value(verifierConfigKey).(*config.VerifierConfig)
 }
 
-func CtxStateContract(entry *stateabi.State) func(context.Context) context.Context {
+func CtxDocumentSODQ(entry data.DocumentSODQ) func(context.Context) context.Context {
 	return func(ctx context.Context) context.Context {
-		return context.WithValue(ctx, stateContractKey, entry)
+		return context.WithValue(ctx, documentSODQKey, entry)
 	}
 }
 
-func StateContract(r *http.Request) *stateabi.State {
-	return r.Context().Value(stateContractKey).(*stateabi.State)
+func DocumentSODQ(r *http.Request) data.DocumentSODQ {
+	return r.Context().Value(documentSODQKey).(data.DocumentSODQ).New()
 }
 
-func CtxIssuer(iss *issuer.Issuer) func(context.Context) context.Context {
+func CtxKeysConfig(entry config.KeysConfig) func(context.Context) context.Context {
 	return func(ctx context.Context) context.Context {
-		return context.WithValue(ctx, issuerCtxKey, iss)
+		return context.WithValue(ctx, keysConfigKey, entry)
 	}
 }
 
-func Issuer(r *http.Request) *issuer.Issuer {
-	return r.Context().Value(issuerCtxKey).(*issuer.Issuer)
+func KeysConfig(r *http.Request) config.KeysConfig {
+	return r.Context().Value(keysConfigKey).(config.KeysConfig)
 }
 
-func CtxVaultClient(vaultClient *vault.VaultClient) func(context.Context) context.Context {
+func CtxAddressesConfig(entry config.AddressesConfig) func(context.Context) context.Context {
 	return func(ctx context.Context) context.Context {
-		return context.WithValue(ctx, vaultClientCtxKey, vaultClient)
+		return context.WithValue(ctx, addressesConfigKey, entry)
 	}
 }
 
-func VaultClient(r *http.Request) *vault.VaultClient {
-	return r.Context().Value(vaultClientCtxKey).(*vault.VaultClient)
-}
-
-func CtxEthClient(client *ethclient.Client) func(context.Context) context.Context {
-	return func(ctx context.Context) context.Context {
-		return context.WithValue(ctx, ethClientCtxKey, client)
-	}
-}
-
-func EthClient(r *http.Request) *ethclient.Client {
-	return r.Context().Value(ethClientCtxKey).(*ethclient.Client)
+func AddressesConfig(r *http.Request) config.AddressesConfig {
+	return r.Context().Value(addressesConfigKey).(config.AddressesConfig)
 }

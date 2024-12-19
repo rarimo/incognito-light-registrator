@@ -2,8 +2,9 @@ package config
 
 import (
 	"os"
-	"time"
 
+	"github.com/rarimo/certificate-transparency-go/x509"
+	"github.com/rarimo/passport-identity-provider/internal/types"
 	"gitlab.com/distributed_lab/figure/v3"
 	"gitlab.com/distributed_lab/kit/comfig"
 	"gitlab.com/distributed_lab/kit/kv"
@@ -14,12 +15,10 @@ type VerifierConfiger interface {
 }
 
 type VerifierConfig struct {
-	VerificationKeys    map[string][]byte
-	MasterCerts         []byte
-	AllowedAge          int
-	RegistrationTimeout time.Duration
-	MultiAccMinLimit    int
-	MultiAccMaxLimit    int
+	VerificationKeys  map[types.HashAlgorithm][]byte
+	MasterCerts       *x509.CertPool
+	DisableTimeChecks bool
+	DisableNameChecks bool
 }
 
 type verifier struct {
@@ -38,10 +37,8 @@ func (v *verifier) VerifierConfig() *VerifierConfig {
 		newCfg := struct {
 			VerificationKeysPaths map[string]string `fig:"verification_keys_paths,required"`
 			MasterCertsPath       string            `fig:"master_certs_path,required"`
-			AllowedAge            int               `fig:"allowed_age,required"`
-			MultiAccMinLimit      int               `fig:"multi_acc_min_limit,required"`
-			MultiAccMaxLimit      int               `fig:"multi_acc_max_limit,required"`
-			RegistrationTimeout   time.Duration     `fig:"registration_timeout"`
+			DisableTimeChecks     bool              `fig:"disable_time_checks"`
+			DisableNameChecks     bool              `fig:"disable_name_checks"`
 		}{}
 
 		err := figure.
@@ -53,14 +50,14 @@ func (v *verifier) VerifierConfig() *VerifierConfig {
 			panic(err)
 		}
 
-		verificationKeys := make(map[string][]byte)
+		verificationKeys := make(map[types.HashAlgorithm][]byte)
 		for algo, path := range newCfg.VerificationKeysPaths {
 			verificationKey, err := os.ReadFile(path)
 			if err != nil {
 				panic(err)
 			}
 
-			verificationKeys[algo] = verificationKey
+			verificationKeys[types.HashAlgorithmFromString(algo)] = verificationKey
 		}
 
 		masterCerts, err := os.ReadFile(newCfg.MasterCertsPath)
@@ -68,13 +65,14 @@ func (v *verifier) VerifierConfig() *VerifierConfig {
 			panic(err)
 		}
 
+		roots := x509.NewCertPool()
+		roots.AppendCertsFromPEM(masterCerts)
+
 		return &VerifierConfig{
-			VerificationKeys:    verificationKeys,
-			MasterCerts:         masterCerts,
-			AllowedAge:          newCfg.AllowedAge,
-			MultiAccMinLimit:    newCfg.MultiAccMinLimit,
-			MultiAccMaxLimit:    newCfg.MultiAccMaxLimit,
-			RegistrationTimeout: newCfg.RegistrationTimeout,
+			VerificationKeys:  verificationKeys,
+			MasterCerts:       roots,
+			DisableTimeChecks: newCfg.DisableTimeChecks,
+			DisableNameChecks: newCfg.DisableNameChecks,
 		}
 	}).(*VerifierConfig)
 }

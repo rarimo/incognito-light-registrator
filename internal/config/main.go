@@ -14,10 +14,9 @@ type Config interface {
 	types.Copuser
 	comfig.Listenerer
 
-	IssuerConfiger
 	VerifierConfiger
-	NetworkConfiger
-	VaultConfiger
+	KeysConfiger
+	AddressesConfiger
 }
 
 type config struct {
@@ -27,22 +26,20 @@ type config struct {
 	comfig.Listenerer
 	getter kv.Getter
 
-	IssuerConfiger
 	VerifierConfiger
-	NetworkConfiger
-	VaultConfiger
+	KeysConfiger
+	AddressesConfiger
 }
 
 func New(getter kv.Getter) Config {
 	return &config{
-		getter:           getter,
-		Databaser:        pgdb.NewDatabaser(getter),
-		Copuser:          copus.NewCopuser(getter),
-		Listenerer:       comfig.NewListenerer(getter),
-		Logger:           comfig.NewLogger(getter, comfig.LoggerOpts{}),
-		IssuerConfiger:   NewIssuerConfiger(getter),
-		VerifierConfiger: NewVerifierConfiger(getter),
-		NetworkConfiger:  NewNetworkConfiger(getter),
-		VaultConfiger:    NewVaultConfiger(getter),
+		getter:            getter,
+		Databaser:         pgdb.NewDatabaser(getter),
+		Copuser:           copus.NewCopuser(getter),
+		Listenerer:        comfig.NewListenerer(getter),
+		Logger:            comfig.NewLogger(getter, comfig.LoggerOpts{}),
+		VerifierConfiger:  NewVerifierConfiger(getter),
+		KeysConfiger:      NewKeysConfiger(getter),
+		AddressesConfiger: NewAddressesConfiger(getter),
 	}
 }

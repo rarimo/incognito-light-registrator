@@ -1,0 +1,31 @@
+allOf:
+  - $ref: '#/components/schemas/SignatureKey'
+  - type: object
+    required:
+      - attributes
+    properties:
+      attributes:
+        type: object
+        required:
+          - passport_hash
+          - public_key
+          - verifier
+          - signature
+        properties:
+          passport_hash:
+            type: string
+            example: 0x7768792064696420796F75206576656E206465636F6465642069743F
+            description: Poseidon hash of truncated signed attributes
+          public_key:
+            type: string
+            example: 0x7768792064696420796F75206576656E206465636F6465642069743F
+            description: Public key parsed from dg15. Omitted (empty string) if passport has no dg15
+          verifier:
+            type: string
+            format: common.Address
+            example: 0x7768792064696420796F75206576656E206465636F6465642069743F
+            description: Verifier contract address
+          signature:
+            type: string
+            example: 0x7768792064696420796F75206576656E206465636F6465642069743F
+            description: ECDSA signature of the abi encoded signed data

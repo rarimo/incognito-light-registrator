@@ -1,33 +1,29 @@
-vault:
-  address: "http://127.0.0.1:8200"
-  mount_path: "secret_data"
-
-network:
-  eth_rpc:
-  state_contract:
-
 verifier:
   verification_keys_paths:
-    sha1: "./sha1_verification_key.json"
-    sha256: "./sha256_verification_key.json"
+    sha1: "./verification_keys/registerIdentityLight160.json"
+    sha224: "./verification_keys/registerIdentityLight224.json"
+    sha256: "./verification_keys/registerIdentityLight256.json"
+    sha384: "./verification_keys/registerIdentityLight384.json"
+    sha512: "./verification_keys/registerIdentityLight512.json"
   master_certs_path: "./masterList.dev.pem"
-  allowed_age: 18
-  multi_acc_min_limit: 10
-  multi_acc_max_limit: 30
-  registration_timeout: 1h
+  disableTimeChecks: false
+  disableNameChecks: false
 
-issuer:
-  base_url: "http://localhost:3002/v1"
-  did: ""
-  claim_type: "VotingCredential"
-  credential_schema: "https://bafybeibbniic63etdbcn5rs5ir5bhelym6ogv46afj35keatzhn2eqnioi.ipfs.w3s.link/VotingCredential.json"
+addresses:
+  registration_contract: a2e2Cbbd0BAa74FE1bb4b61B12D420072806FFe0
+  verifiers:
+    sha1: 50f07F4E66Cc7A09186120B6e0152602768923ac
+    sha224: b83D5fd8A498482b123EE1837B86B82CCd33240D
+    sha256: 91E3d9ef73afC08E083719e8CF052c1d810aF191
+    sha384: Abf2Fef1aF4ca7cB7EB3F4F2169D55C502E086aD
+    sha512: b7609357EAEA80C8a064Aa7B9Ff1D7E7b76fDB98
 
 log:
   level: debug
   disable_sentry: true
 
 db:
-  url: postgres://voting:voting@localhost:35432/voting?sslmode=disable
+  url: postgres://ilr:ilr@localhost:5432/ilr?sslmode=disable
 
 listener:
   addr: :8000
