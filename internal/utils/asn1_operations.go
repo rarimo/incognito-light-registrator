@@ -59,8 +59,8 @@ func TruncateHexPrefix(hexString string) string {
 }
 
 func BuildSignedData(
-		contract, verifier *common.Address,
-		passportHash, dg1Commitment, publicKey [32]byte,
+	contract, verifier *common.Address,
+	passportHash, dg1Commitment, publicKey [32]byte,
 ) ([]byte, error) {
 	return abiEncodePacked(types.RegistrationSimplePrefix, contract, passportHash[:], dg1Commitment[:], publicKey[:], verifier)
 }
@@ -135,7 +135,7 @@ func ToEthSignedMessageHash(data []byte) []byte {
 }
 
 func TruncateDg1Hash(dg1Hash []byte) (dg1Truncated [32]byte) {
-	truncateStart := types.DG1TruncateLength - len(dg1Hash)
+	truncateStart := 32 - len(dg1Hash)
 	dg1HashStart := 0
 	if len(dg1Hash) > types.DG1TruncateLength {
 		dg1HashStart = len(dg1Hash) - types.DG1TruncateLength
