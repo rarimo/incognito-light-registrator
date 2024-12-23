@@ -21,9 +21,8 @@ type VaultConfiger interface {
 }
 
 type VaultConfig struct {
-	MountPath      string `json:"VAULT_MOUNT_PATH"`
-	PrivateKeyPath string `json:"VAULT_PRIVATE_KEY_PATH"`
-	SecretPath     string `json:"VAULT_SECRET_PATH"`
+	MountPath  string `json:"VAULT_MOUNT_PATH"`
+	SecretPath string `json:"VAULT_SECRET_PATH"`
 }
 
 type ClientKeysCredentialsConfig struct {

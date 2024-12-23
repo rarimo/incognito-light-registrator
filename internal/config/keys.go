@@ -26,7 +26,7 @@ type Keys struct {
 }
 
 type KeysConfig struct {
-	SignatureKey *ecdsa.PrivateKey `fig:"signature_key,required"`
+	SignatureKey *ecdsa.PrivateKey `fig:"signature_key"`
 }
 
 func (e *Keys) KeysConfig() KeysConfig {
