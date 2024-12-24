@@ -67,7 +67,6 @@ func TestTruncateDg1Hash(t *testing.T) {
 				return result
 			}(),
 		},
-
 	}
 
 	for _, tt := range tests {
