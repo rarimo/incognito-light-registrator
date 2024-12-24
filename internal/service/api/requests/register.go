@@ -2,12 +2,12 @@ package requests
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/rarimo/passport-identity-provider/internal/types"
 	"github.com/rarimo/passport-identity-provider/resources"
-	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
 func NewRegisterRequest(r *http.Request) (request resources.RegisterResponse, err error) {
@@ -26,7 +26,7 @@ func validateRegister(r resources.RegisterResponse) error {
 			validation.By(func(value interface{}) error {
 				_, ok := types.IsValidSignatureAlgorithm(value.(string))
 				if !ok {
-					return errors.New("unsupported signature algorithm")
+					return fmt.Errorf("unsupported signature algorithm: %s", value)
 				}
 
 				return nil
@@ -38,7 +38,7 @@ func validateRegister(r resources.RegisterResponse) error {
 			validation.By(func(value interface{}) error {
 				_, ok := types.IsValidHashAlgorithm(value.(string))
 				if !ok {
-					return errors.New("unsupported hash algorithm")
+					return fmt.Errorf("unsupported hash algorithm: %s", value)
 				}
 
 				return nil
