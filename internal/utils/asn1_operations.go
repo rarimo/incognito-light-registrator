@@ -8,6 +8,7 @@ import (
 	"encoding/asn1"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -50,17 +51,22 @@ func GetDataGroup(encapsulatedContent []byte, tag int) ([]byte, error) {
 	return nil, nil
 }
 
-func TruncateHexPrefix(hexString string) string {
-	if len(hexString) > 2 && hexString[:2] == "0x" {
-		return hexString[2:]
+func TruncateHexPrefix(hexString *string) *string {
+	if hexString == nil || *hexString == "0x" || *hexString == "" {
+		return nil
+	}
+
+	if strings.HasPrefix(*hexString, "0x") && len(*hexString) > 2 {
+		trimmed := (*hexString)[2:]
+		return &trimmed
 	}
 
 	return hexString
 }
 
 func BuildSignedData(
-	contract, verifier *common.Address,
-	passportHash, dg1Commitment, publicKey [32]byte,
+		contract, verifier *common.Address,
+		passportHash, dg1Commitment, publicKey [32]byte,
 ) ([]byte, error) {
 	return abiEncodePacked(types.RegistrationSimplePrefix, contract, passportHash[:], dg1Commitment[:], publicKey[:], verifier)
 }

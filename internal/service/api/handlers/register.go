@@ -51,27 +51,15 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	documentSOD := data.DocumentSOD{
 		HashAlgorigthm:      algorithmPair.HashAlgorithm,
 		SignatureAlgorithm:  algorithmPair.SignatureAlgorithm,
-		SignedAttributes:    utils.TruncateHexPrefix(req.Data.Attributes.DocumentSod.SignedAttributes),
-		EncapsulatedContent: utils.TruncateHexPrefix(req.Data.Attributes.DocumentSod.EncapsulatedContent),
-		Signature:           utils.TruncateHexPrefix(req.Data.Attributes.DocumentSod.Signature),
+		SignedAttributes:    *utils.TruncateHexPrefix(&req.Data.Attributes.DocumentSod.SignedAttributes),
+		EncapsulatedContent: *utils.TruncateHexPrefix(&req.Data.Attributes.DocumentSod.EncapsulatedContent),
+		Signature:           *utils.TruncateHexPrefix(&req.Data.Attributes.DocumentSod.Signature),
+		AaSignature:         utils.TruncateHexPrefix(req.Data.Attributes.DocumentSod.AaSignature),
+		DG15:                utils.TruncateHexPrefix(req.Data.Attributes.DocumentSod.Dg15),
+		RawSOD:              utils.TruncateHexPrefix(req.Data.Attributes.DocumentSod.Sod),
 		PemFile:             req.Data.Attributes.DocumentSod.PemFile,
 		ErrorKind:           nil,
 		Error:               nil,
-	}
-
-	if req.Data.Attributes.DocumentSod.AaSignature != nil && *req.Data.Attributes.DocumentSod.AaSignature != "" {
-		truncatedAaSignature := utils.TruncateHexPrefix(*req.Data.Attributes.DocumentSod.AaSignature)
-		documentSOD.AaSignature = &truncatedAaSignature
-	}
-
-	if req.Data.Attributes.DocumentSod.Dg15 != nil && *req.Data.Attributes.DocumentSod.Dg15 != "" {
-		truncatedDg15 := utils.TruncateHexPrefix(*req.Data.Attributes.DocumentSod.Dg15)
-		documentSOD.DG15 = &truncatedDg15
-	}
-
-	if req.Data.Attributes.DocumentSod.Sod != nil && *req.Data.Attributes.DocumentSod.Sod != "" {
-		truncatedSod := utils.TruncateHexPrefix(*req.Data.Attributes.DocumentSod.Sod)
-		documentSOD.RawSOD = &truncatedSod
 	}
 
 	var response *resources.SignatureResponse
@@ -127,13 +115,14 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		verifierCfg.VerificationKeys[algorithmPair.HashAlgorithm],
 	); err != nil {
 		log.WithError(err).Error("failed to verify zk proof")
+		// TODO: Add documentSOD.ErrorKind and documentSOD.Error initialization for all errors in this handler
 		jsonError = problems.BadRequest(validation.Errors{
 			"zk_proof": err,
 		})
 		return
 	}
 
-	signedAttributes, err := hex.DecodeString(utils.TruncateHexPrefix(documentSOD.SignedAttributes))
+	signedAttributes, err := hex.DecodeString(documentSOD.SignedAttributes)
 	if err != nil {
 		log.WithError(err).Error("failed to decode signed attributes")
 		jsonError = problems.BadRequest(validation.Errors{
@@ -142,7 +131,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	encapsulatedContent, err := hex.DecodeString(utils.TruncateHexPrefix(documentSOD.EncapsulatedContent))
+	encapsulatedContent, err := hex.DecodeString(documentSOD.EncapsulatedContent)
 	if err != nil {
 		log.WithError(err).Error("failed to decode encapsulated content")
 		jsonError = problems.BadRequest(validation.Errors{
@@ -160,7 +149,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slaveSignature, err := hex.DecodeString(utils.TruncateHexPrefix(documentSOD.Signature))
+	slaveSignature, err := hex.DecodeString(documentSOD.Signature)
 	if err != nil {
 		log.WithError(err).Error("failed to decode slaveSignature")
 		jsonError = problems.BadRequest(validation.Errors{
@@ -259,10 +248,12 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 	var extractedDg15 []byte
 	if documentSOD.DG15 != nil {
-		extractedDg15, err = hex.DecodeString(utils.TruncateHexPrefix(*documentSOD.DG15))
+		extractedDg15, err = hex.DecodeString(*documentSOD.DG15)
 		if err != nil {
 			log.WithError(err).Error("failed to decode dg15Hash")
-			jsonError = append(jsonError, problems.InternalError())
+			jsonError = append(jsonError, problems.BadRequest(validation.Errors{
+				"dg15": errors.New("failed to decode dg15Hash"),
+			})...)
 			return
 		}
 
@@ -331,12 +322,12 @@ func Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func verifySod(
-	signedAttributes []byte,
-	encapsulatedContent []byte,
-	signature []byte,
-	cert *x509.Certificate,
-	algorithmPair types.AlgorithmPair,
-	cfg *config.VerifierConfig,
+		signedAttributes []byte,
+		encapsulatedContent []byte,
+		signature []byte,
+		cert *x509.Certificate,
+		algorithmPair types.AlgorithmPair,
+		cfg *config.VerifierConfig,
 ) error {
 	if err := validateSignedAttributes(signedAttributes, encapsulatedContent, algorithmPair.HashAlgorithm); err != nil {
 		return &types.SodError{
@@ -397,9 +388,9 @@ func parseCertificate(pemFile []byte) (*x509.Certificate, error) {
 }
 
 func validateSignedAttributes(
-	signedAttributes,
-	encapsulatedContent []byte,
-	hashAlgorithm types.HashAlgorithm,
+		signedAttributes,
+		encapsulatedContent []byte,
+		hashAlgorithm types.HashAlgorithm,
 ) error {
 	signedAttributesASN1 := make([]asn1.RawValue, 0)
 
@@ -437,10 +428,10 @@ func validateSignedAttributes(
 }
 
 func verifySignature(
-	signature []byte,
-	cert *x509.Certificate,
-	signedAttributes []byte,
-	algorithmPair types.AlgorithmPair,
+		signature []byte,
+		cert *x509.Certificate,
+		signedAttributes []byte,
+		algorithmPair types.AlgorithmPair,
 ) error {
 	h := types.GeneralHash(algorithmPair.HashAlgorithm)
 	h.Write(signedAttributes)
