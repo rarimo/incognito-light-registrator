@@ -4,7 +4,9 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rsa"
+	"encoding/asn1"
 	"hash"
+	"math/big"
 
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
@@ -49,13 +51,26 @@ func GeneralVerify(publicKey interface{}, hash []byte, signature []byte, algo Al
 }
 
 func verifyECDSA(data, sig []byte, publicKey *ecdsa.PublicKey) error {
-	if ok := ecdsa.VerifyASN1(publicKey, data, sig); !ok {
-		return errors.New("failed to verify ECDSA signature")
+	// Attempt to parse the signature as ASN.1 DER format
+	if _, err := asn1.Unmarshal(sig, new(asn1.RawValue)); err == nil {
+		if ecdsa.VerifyASN1(publicKey, data, sig) {
+			return nil
+		}
+		return errors.New("failed to verify ECDSA signature in ASN.1 format")
 	}
 
-	return nil
-}
+	// Handle raw (r || s) signature format
+	if len(sig) != 64 {
+		return errors.New("invalid ECDSA signature length")
+	}
 
+	r, s := new(big.Int).SetBytes(sig[:32]), new(big.Int).SetBytes(sig[32:])
+	if ecdsa.Verify(publicKey, data, r, s) {
+		return nil
+	}
+
+	return errors.New("failed to verify ECDSA signature in raw format")
+}
 func GeneralHash(algorithm HashAlgorithm) hash.Hash {
 	switch algorithm {
 	case SHA1:
