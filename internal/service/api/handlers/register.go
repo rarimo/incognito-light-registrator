@@ -207,7 +207,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		log.WithError(err).Error("failed to verify SOD")
+		log.WithError(sodError.VerboseError).Error("failed to verify SOD")
 
 		documentSOD.ErrorKind = sodError.KindPtr()
 		documentSOD.Error = sodError.VerboseErrorPtr()
