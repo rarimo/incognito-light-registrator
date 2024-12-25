@@ -71,6 +71,7 @@ func verifyECDSA(data, sig []byte, publicKey *ecdsa.PublicKey) error {
 
 	return errors.New("failed to verify ECDSA signature in raw format")
 }
+
 func GeneralHash(algorithm HashAlgorithm) hash.Hash {
 	switch algorithm {
 	case SHA1:
