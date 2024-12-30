@@ -19,19 +19,17 @@ import (
 
 func ConvertBitsToBytes(data []byte, numBits int) ([]byte, error) {
 	numBytes := (numBits + 7) / 8
-	result := make([]byte, numBytes)
-
-	startIndex := len(data) - numBytes
-	if startIndex < 0 {
-		startIndex = 0
+	if len(data) < numBytes {
+		return nil, fmt.Errorf("data is too short, requires at least %d bytes", numBytes)
 	}
 
-	copy(result[max(0, numBytes-len(data)):], data[startIndex:])
+	result := make([]byte, numBytes)
+	copy(result, data[:numBytes])
 
 	remainingBits := numBits % 8
 	if remainingBits != 0 {
-		mask := byte(0xFF >> (8 - remainingBits))
-		result[0] &= mask
+		mask := byte(0xFF << (8 - remainingBits))
+		result[numBytes-1] &= mask
 	}
 
 	return result, nil
