@@ -188,6 +188,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		jsonError = append(jsonError, problems.InternalError())
 		return
 	}
+	proofDg1CommitmentBytes := proofDg1Commitment.FillBytes(make([]byte, 32))
 
 	dg1Truncated := utils.TruncateDg1Hash(dg1Hash)
 	if !bytes.Equal(dg1Truncated[:], proofDg1Decimal.FillBytes(make([]byte, 32))) {
@@ -223,19 +224,26 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	truncatedSignedAttributes, err := utils.ConvertBitsToBytes(signedAttributes, 252)
+	saHash := types.GeneralHash(algorithmPair.HashAlgorithm)
+	saHash.Write(signedAttributes)
+	saHashBytes := saHash.Sum(nil)
+
+	truncatedSignedAttributes, err := utils.ExtractFirstNBits(saHashBytes, 252)
 	if err != nil {
 		log.WithError(err).Error("failed to extract bits from signed attributes")
 		jsonError = append(jsonError, problems.InternalError())
 		return
 	}
 
-	passportHash, err := poseidon.HashBytes(truncatedSignedAttributes)
+	toBeHashed := []*big.Int{big.NewInt(0).SetBytes(utils.ReverseBits(truncatedSignedAttributes))}
+	passportHash, err := poseidon.Hash(toBeHashed)
 	if err != nil {
 		log.WithError(err).Error("failed to hash signed attributes")
 		jsonError = append(jsonError, problems.InternalError())
 		return
 	}
+
+	passportHashBytes := passportHash.FillBytes(make([]byte, 32))
 
 	dg15Hash, err := utils.GetDataGroup(encapsulatedContent, 15)
 	if err != nil {
@@ -287,8 +295,8 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	rawSignedData, err := utils.BuildSignedData(
 		addressesCfg.RegistrationContract,
 		verifierContract,
-		[32]byte(passportHash.FillBytes(make([]byte, 32))),
-		[32]byte(proofDg1Commitment.FillBytes(make([]byte, 32))),
+		[32]byte(passportHashBytes),
+		[32]byte(proofDg1CommitmentBytes),
 		passportPubkeyHash,
 	)
 	if err != nil {
@@ -312,7 +320,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		Data: resources.Signature{
 			Key: resources.NewKeyInt64(0, resources.SIGNATURE),
 			Attributes: resources.SignatureAttributes{
-				PassportHash: hexutil.Encode(passportHash.Bytes()),
+				PassportHash: hexutil.Encode(passportHashBytes),
 				PublicKey:    hexutil.Encode(passportPubkeyHash[:]),
 				Verifier:     *verifierContract,
 				Signature:    hexutil.Encode(signature),
@@ -322,12 +330,12 @@ func Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func verifySod(
-	signedAttributes []byte,
-	encapsulatedContent []byte,
-	signature []byte,
-	cert *x509.Certificate,
-	algorithmPair types.AlgorithmPair,
-	cfg *config.VerifierConfig,
+		signedAttributes []byte,
+		encapsulatedContent []byte,
+		signature []byte,
+		cert *x509.Certificate,
+		algorithmPair types.AlgorithmPair,
+		cfg *config.VerifierConfig,
 ) error {
 	if err := validateSignedAttributes(signedAttributes, encapsulatedContent, algorithmPair.HashAlgorithm); err != nil {
 		return &types.SodError{
@@ -388,9 +396,9 @@ func parseCertificate(pemFile []byte) (*x509.Certificate, error) {
 }
 
 func validateSignedAttributes(
-	signedAttributes,
-	encapsulatedContent []byte,
-	hashAlgorithm types.HashAlgorithm,
+		signedAttributes,
+		encapsulatedContent []byte,
+		hashAlgorithm types.HashAlgorithm,
 ) error {
 	signedAttributesASN1 := make([]asn1.RawValue, 0)
 
@@ -428,10 +436,10 @@ func validateSignedAttributes(
 }
 
 func verifySignature(
-	signature []byte,
-	cert *x509.Certificate,
-	signedAttributes []byte,
-	algorithmPair types.AlgorithmPair,
+		signature []byte,
+		cert *x509.Certificate,
+		signedAttributes []byte,
+		algorithmPair types.AlgorithmPair,
 ) error {
 	h := types.GeneralHash(algorithmPair.HashAlgorithm)
 	h.Write(signedAttributes)

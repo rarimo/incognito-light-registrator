@@ -17,21 +17,25 @@ import (
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
-func ConvertBitsToBytes(data []byte, numBits int) ([]byte, error) {
-	numBytes := (numBits + 7) / 8
-	result := make([]byte, numBytes)
-
-	startIndex := len(data) - numBytes
-	if startIndex < 0 {
-		startIndex = 0
+func ExtractFirstNBits(data []byte, n uint) ([]byte, error) {
+	if n == 0 {
+		return []byte{}, nil
 	}
 
-	copy(result[max(0, numBytes-len(data)):], data[startIndex:])
+	numBytes := (n + 7) / 8
 
-	remainingBits := numBits % 8
+	if uint(len(data))*8 < n {
+		return nil, fmt.Errorf("not enough bits in data: required %d, available %d", n, len(data)*8)
+	}
+
+	result := make([]byte, numBytes)
+
+	copy(result, data[:numBytes])
+
+	remainingBits := n % 8
 	if remainingBits != 0 {
-		mask := byte(0xFF >> (8 - remainingBits))
-		result[0] &= mask
+		mask := byte(0xFF << (8 - remainingBits))
+		result[numBytes-1] &= mask
 	}
 
 	return result, nil
@@ -67,8 +71,8 @@ func TruncateHexPrefix(hexString *string) *string {
 }
 
 func BuildSignedData(
-	contract, verifier *common.Address,
-	passportHash, dg1Commitment, publicKey [32]byte,
+		contract, verifier *common.Address,
+		passportHash, dg1Commitment, publicKey [32]byte,
 ) ([]byte, error) {
 	return abiEncodePacked(types.RegistrationSimplePrefix, contract, passportHash[:], dg1Commitment[:], publicKey[:], verifier)
 }
@@ -152,6 +156,28 @@ func TruncateDg1Hash(dg1Hash []byte) (dg1Truncated [32]byte) {
 
 	copy(dg1Truncated[truncateStart:], dg1Hash[dg1HashStart:])
 	return dg1Truncated
+}
+
+func ReverseBits(input []byte) []byte {
+	n := len(input)
+	output := make([]byte, n)
+
+	for i := 0; i < n; i++ {
+		output[i] = reverseByte(input[i])
+	}
+
+	for i := 0; i < n/2; i++ {
+		output[i], output[n-1-i] = output[n-1-i], output[i]
+	}
+
+	return output
+}
+
+func reverseByte(b byte) byte {
+	b = (b&0xF0)>>4 | (b&0x0F)<<4
+	b = (b&0xCC)>>2 | (b&0x33)<<2
+	b = (b&0xAA)>>1 | (b&0x55)<<1
+	return b
 }
 
 func generalPublicKeyExtraction(dg15 []byte) (any, error) {
