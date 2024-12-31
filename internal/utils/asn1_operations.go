@@ -17,20 +17,22 @@ import (
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
+// ExtractFirstNBits extracts the first n bits from data.
+// If data contains fewer than n bits, it pads the result with zeros.
 func ExtractFirstNBits(data []byte, n uint) ([]byte, error) {
 	if n == 0 {
 		return []byte{}, nil
 	}
 
 	numBytes := (n + 7) / 8
-
-	if uint(len(data))*8 < n {
-		return nil, fmt.Errorf("not enough bits in data: required %d, available %d", n, len(data)*8)
-	}
-
 	result := make([]byte, numBytes)
 
-	copy(result, data[:numBytes])
+	bytesToCopy := numBytes
+	if uint(len(data)) < numBytes {
+		bytesToCopy = uint(len(data))
+	}
+
+	copy(result, data[:bytesToCopy])
 
 	remainingBits := n % 8
 	if remainingBits != 0 {
@@ -71,8 +73,8 @@ func TruncateHexPrefix(hexString *string) *string {
 }
 
 func BuildSignedData(
-		contract, verifier *common.Address,
-		passportHash, dg1Commitment, publicKey [32]byte,
+	contract, verifier *common.Address,
+	passportHash, dg1Commitment, publicKey [32]byte,
 ) ([]byte, error) {
 	return abiEncodePacked(types.RegistrationSimplePrefix, contract, passportHash[:], dg1Commitment[:], publicKey[:], verifier)
 }
