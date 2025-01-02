@@ -430,7 +430,7 @@ func validateSignedAttributes(
 		fmt.Printf("found different hash algorithm in signed attr %s\n", hashAlgorithmFromDigest.String())
 		if _, ok := types.IsValidHashAlgorithm(hashAlgorithmFromDigest.String()); ok {
 			fmt.Printf("changing hash algorithm from %s to %s\n", hashAlgorithm.String(), hashAlgorithmFromDigest.String())
-			hashAlgorithm = &hashAlgorithmFromDigest
+			*hashAlgorithm = hashAlgorithmFromDigest
 		}
 	}
 
