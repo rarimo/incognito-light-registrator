@@ -44,12 +44,13 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	algorithmPair := types.AlgorithmPair{
-		HashAlgorithm:      types.HashAlgorithmFromString(req.Data.Attributes.DocumentSod.HashAlgorithm),
+		DgHashAlgorithm:    types.HashAlgorithmFromString(req.Data.Attributes.DocumentSod.HashAlgorithm),
+		SignedAttrHashAlg:  types.HashAlgorithmFromString(req.Data.Attributes.DocumentSod.HashAlgorithm),
 		SignatureAlgorithm: types.SignatureAlgorithmFromString(req.Data.Attributes.DocumentSod.SignatureAlgorithm),
 	}
 
 	documentSOD := data.DocumentSOD{
-		HashAlgorigthm:      algorithmPair.HashAlgorithm,
+		HashAlgorigthm:      algorithmPair.DgHashAlgorithm,
 		SignatureAlgorithm:  algorithmPair.SignatureAlgorithm,
 		SignedAttributes:    *utils.TruncateHexPrefix(&req.Data.Attributes.DocumentSod.SignedAttributes),
 		EncapsulatedContent: *utils.TruncateHexPrefix(&req.Data.Attributes.DocumentSod.EncapsulatedContent),
@@ -112,7 +113,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 	if err := verifier.VerifyGroth16(
 		req.Data.Attributes.ZkProof,
-		verifierCfg.VerificationKeys[algorithmPair.HashAlgorithm],
+		verifierCfg.VerificationKeys[algorithmPair.DgHashAlgorithm],
 	); err != nil {
 		log.WithError(err).Error("failed to verify zk proof")
 		// TODO: Add documentSOD.ErrorKind and documentSOD.Error initialization for all errors in this handler
@@ -199,7 +200,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = verifySod(signedAttributes, encapsulatedContent, slaveSignature, cert, algorithmPair, verifierCfg)
+	saHashBytes, err := verifySod(signedAttributes, encapsulatedContent, slaveSignature, cert, &algorithmPair, verifierCfg)
 	if err != nil {
 		sodError := new(types.SodError)
 		if !errors2.As(err, &sodError) {
@@ -223,10 +224,6 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-
-	saHash := types.GeneralHash(algorithmPair.HashAlgorithm)
-	saHash.Write(signedAttributes)
-	saHashBytes := saHash.Sum(nil)
 
 	truncatedSignedAttributes, err := utils.ExtractFirstNBits(saHashBytes, 252)
 	if err != nil {
@@ -265,7 +262,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		extractedDg15Hash := types.GeneralHash(algorithmPair.HashAlgorithm)
+		extractedDg15Hash := types.GeneralHash(algorithmPair.DgHashAlgorithm)
 		extractedDg15Hash.Write(extractedDg15)
 
 		if !bytes.Equal(dg15Hash, extractedDg15Hash.Sum(nil)) {
@@ -285,9 +282,9 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	addressesCfg := api.AddressesConfig(r)
-	verifierContract, ok := addressesCfg.Verifiers[algorithmPair.HashAlgorithm]
+	verifierContract, ok := addressesCfg.Verifiers[algorithmPair.DgHashAlgorithm]
 	if !ok {
-		log.Errorf("No verifier contract found for hash algorithm %s", algorithmPair.HashAlgorithm)
+		log.Errorf("No verifier contract found for hash algorithm %s", algorithmPair.DgHashAlgorithm)
 		jsonError = append(jsonError, problems.InternalError())
 		return
 	}
@@ -330,15 +327,20 @@ func Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func verifySod(
-		signedAttributes []byte,
-		encapsulatedContent []byte,
-		signature []byte,
-		cert *x509.Certificate,
-		algorithmPair types.AlgorithmPair,
-		cfg *config.VerifierConfig,
-) error {
-	if err := validateSignedAttributes(signedAttributes, encapsulatedContent, algorithmPair.HashAlgorithm); err != nil {
-		return &types.SodError{
+	signedAttributes []byte,
+	encapsulatedContent []byte,
+	signature []byte,
+	cert *x509.Certificate,
+	algorithmPair *types.AlgorithmPair,
+	cfg *config.VerifierConfig,
+) ([]byte, error) {
+	if algorithmPair == nil {
+		return nil, errors.New("algorithm pair is nil")
+	}
+
+	err := validateSignedAttributes(signedAttributes, encapsulatedContent, &algorithmPair.SignedAttrHashAlg)
+	if err != nil {
+		return nil, &types.SodError{
 			VerboseError: err,
 			Details: &types.SodErrorDetails{
 				Kind:        types.SAValidateErr,
@@ -347,10 +349,11 @@ func verifySod(
 		}
 	}
 
-	if err := verifySignature(signature, cert, signedAttributes, algorithmPair); err != nil {
+	signedAttrHash, err := verifySignature(signature, cert, signedAttributes, *algorithmPair)
+	if err != nil {
 		unwrappedErr := errors2.Unwrap(err)
 		if errors2.Is(unwrappedErr, types.ErrInvalidPublicKey{}) {
-			return &types.SodError{
+			return nil, &types.SodError{
 				VerboseError: err,
 				Details: &types.SodErrorDetails{
 					Kind:        types.PEMFilePubKeyErr,
@@ -359,7 +362,7 @@ func verifySod(
 			}
 		}
 
-		return &types.SodError{
+		return nil, &types.SodError{
 			VerboseError: err,
 			Details: &types.SodErrorDetails{
 				Kind:        types.SigVerifyErr,
@@ -368,8 +371,9 @@ func verifySod(
 		}
 	}
 
-	if err := validateCert(cert, cfg.MasterCerts, cfg.DisableTimeChecks, cfg.DisableNameChecks); err != nil {
-		return &types.SodError{
+	err = validateCert(cert, cfg.MasterCerts, cfg.DisableTimeChecks, cfg.DisableNameChecks)
+	if err != nil {
+		return nil, &types.SodError{
 			VerboseError: err,
 			Details: &types.SodErrorDetails{
 				Kind:        types.PEMFileValidateErr,
@@ -378,7 +382,7 @@ func verifySod(
 		}
 	}
 
-	return nil
+	return signedAttrHash, nil
 }
 
 func parseCertificate(pemFile []byte) (*x509.Certificate, error) {
@@ -396,9 +400,9 @@ func parseCertificate(pemFile []byte) (*x509.Certificate, error) {
 }
 
 func validateSignedAttributes(
-		signedAttributes,
-		encapsulatedContent []byte,
-		hashAlgorithm types.HashAlgorithm,
+	signedAttributes,
+	encapsulatedContent []byte,
+	hashAlgorithm *types.HashAlgorithm,
 ) error {
 	signedAttributesASN1 := make([]asn1.RawValue, 0)
 
@@ -415,13 +419,28 @@ func validateSignedAttributes(
 		return errors.Wrap(err, "failed to unmarshal ASN1")
 	}
 
-	h := types.GeneralHash(hashAlgorithm)
-	h.Write(encapsulatedContent)
-	d := h.Sum(nil)
-
 	if len(digestAttr.Digest) == 0 {
 		return errors.New("signed attributes digest values amount is 0")
 	}
+
+	hashAlgorithmFromDigest := types.HashAlgorithmFromSize(len(digestAttr.Digest[0].Bytes))
+	if hashAlgorithm == nil {
+		fmt.Printf("passed hash algorithm is nil, using from signed attr: %s\n", hashAlgorithmFromDigest.String())
+		hashAlgorithm = &hashAlgorithmFromDigest
+	}
+
+	if hashAlgorithmFromDigest != *hashAlgorithm {
+		// TODO use log
+		fmt.Printf("found different hash algorithm in signed attr %s\n", hashAlgorithmFromDigest.String())
+		if _, ok := types.IsValidHashAlgorithm(hashAlgorithmFromDigest.String()); ok {
+			fmt.Printf("changing hash algorithm from %s to %s\n", hashAlgorithm.String(), hashAlgorithmFromDigest.String())
+			*hashAlgorithm = hashAlgorithmFromDigest
+		}
+	}
+
+	h := types.GeneralHash(*hashAlgorithm)
+	h.Write(encapsulatedContent)
+	d := h.Sum(nil)
 
 	if !bytes.Equal(digestAttr.Digest[0].Bytes, d) {
 		return errors.From(
@@ -436,20 +455,20 @@ func validateSignedAttributes(
 }
 
 func verifySignature(
-		signature []byte,
-		cert *x509.Certificate,
-		signedAttributes []byte,
-		algorithmPair types.AlgorithmPair,
-) error {
-	h := types.GeneralHash(algorithmPair.HashAlgorithm)
+	signature []byte,
+	cert *x509.Certificate,
+	signedAttributes []byte,
+	algorithmPair types.AlgorithmPair,
+) ([]byte, error) {
+	h := types.GeneralHash(algorithmPair.SignedAttrHashAlg)
 	h.Write(signedAttributes)
 	d := h.Sum(nil)
 
 	if err := types.GeneralVerify(cert.PublicKey, d, signature, algorithmPair); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return d, nil
 }
 
 func validateCert(cert *x509.Certificate, masterCerts *x509.CertPool, disableTimeChecks, disableNameChecks bool) error {

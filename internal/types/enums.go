@@ -20,6 +20,14 @@ var hashAlgorithmMap = map[string]HashAlgorithm{
 	"SHA512": SHA512,
 }
 
+var hashAlgorithmSizeMap = map[int]HashAlgorithm{
+	20: SHA1,
+	28: SHA224,
+	32: SHA256,
+	48: SHA384,
+	64: SHA512,
+}
+
 func (h HashAlgorithm) String() string {
 	switch h {
 	case SHA1:
@@ -39,6 +47,14 @@ func (h HashAlgorithm) String() string {
 
 func HashAlgorithmFromString(alg string) HashAlgorithm {
 	h, ok := hashAlgorithmMap[strings.ToUpper(alg)]
+	if !ok {
+		return HashAlgorithm(0)
+	}
+	return h
+}
+
+func HashAlgorithmFromSize(size int) HashAlgorithm {
+	h, ok := hashAlgorithmSizeMap[size]
 	if !ok {
 		return HashAlgorithm(0)
 	}
