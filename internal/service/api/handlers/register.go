@@ -330,12 +330,12 @@ func Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func verifySod(
-		signedAttributes []byte,
-		encapsulatedContent []byte,
-		signature []byte,
-		cert *x509.Certificate,
-		algorithmPair types.AlgorithmPair,
-		cfg *config.VerifierConfig,
+	signedAttributes []byte,
+	encapsulatedContent []byte,
+	signature []byte,
+	cert *x509.Certificate,
+	algorithmPair types.AlgorithmPair,
+	cfg *config.VerifierConfig,
 ) error {
 	if err := validateSignedAttributes(signedAttributes, encapsulatedContent, algorithmPair.HashAlgorithm); err != nil {
 		return &types.SodError{
@@ -396,9 +396,9 @@ func parseCertificate(pemFile []byte) (*x509.Certificate, error) {
 }
 
 func validateSignedAttributes(
-		signedAttributes,
-		encapsulatedContent []byte,
-		hashAlgorithm types.HashAlgorithm,
+	signedAttributes,
+	encapsulatedContent []byte,
+	hashAlgorithm types.HashAlgorithm,
 ) error {
 	signedAttributesASN1 := make([]asn1.RawValue, 0)
 
@@ -415,13 +415,23 @@ func validateSignedAttributes(
 		return errors.Wrap(err, "failed to unmarshal ASN1")
 	}
 
-	h := types.GeneralHash(hashAlgorithm)
-	h.Write(encapsulatedContent)
-	d := h.Sum(nil)
-
 	if len(digestAttr.Digest) == 0 {
 		return errors.New("signed attributes digest values amount is 0")
 	}
+
+	hashAlgorithmFromDigest := types.HashAlgorithmFromSize(len(digestAttr.Digest[0].Bytes))
+	if hashAlgorithmFromDigest != hashAlgorithm {
+		// TODO use log
+		fmt.Printf("found different hash algorithm in signed attr %s\n", hashAlgorithmFromDigest.String())
+		if _, ok := types.IsValidHashAlgorithm(hashAlgorithmFromDigest.String()); ok {
+			fmt.Printf("changing hash algorithm from %s to %s\n", hashAlgorithm.String(), hashAlgorithmFromDigest.String())
+			hashAlgorithm = hashAlgorithmFromDigest
+		}
+	}
+
+	h := types.GeneralHash(hashAlgorithm)
+	h.Write(encapsulatedContent)
+	d := h.Sum(nil)
 
 	if !bytes.Equal(digestAttr.Digest[0].Bytes, d) {
 		return errors.From(
@@ -436,10 +446,10 @@ func validateSignedAttributes(
 }
 
 func verifySignature(
-		signature []byte,
-		cert *x509.Certificate,
-		signedAttributes []byte,
-		algorithmPair types.AlgorithmPair,
+	signature []byte,
+	cert *x509.Certificate,
+	signedAttributes []byte,
+	algorithmPair types.AlgorithmPair,
 ) error {
 	h := types.GeneralHash(algorithmPair.HashAlgorithm)
 	h.Write(signedAttributes)
