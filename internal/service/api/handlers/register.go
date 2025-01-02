@@ -337,7 +337,7 @@ func verifySod(
 	algorithmPair types.AlgorithmPair,
 	cfg *config.VerifierConfig,
 ) error {
-	if err := validateSignedAttributes(signedAttributes, encapsulatedContent, algorithmPair.HashAlgorithm); err != nil {
+	if err := validateSignedAttributes(signedAttributes, encapsulatedContent, &algorithmPair.HashAlgorithm); err != nil {
 		return &types.SodError{
 			VerboseError: err,
 			Details: &types.SodErrorDetails{
@@ -398,7 +398,7 @@ func parseCertificate(pemFile []byte) (*x509.Certificate, error) {
 func validateSignedAttributes(
 	signedAttributes,
 	encapsulatedContent []byte,
-	hashAlgorithm types.HashAlgorithm,
+	hashAlgorithm *types.HashAlgorithm,
 ) error {
 	signedAttributesASN1 := make([]asn1.RawValue, 0)
 
@@ -420,16 +420,21 @@ func validateSignedAttributes(
 	}
 
 	hashAlgorithmFromDigest := types.HashAlgorithmFromSize(len(digestAttr.Digest[0].Bytes))
-	if hashAlgorithmFromDigest != hashAlgorithm {
+	if hashAlgorithm == nil {
+		fmt.Printf("passed hash algorithm is nil, using from signed attr: %s\n", hashAlgorithmFromDigest.String())
+		hashAlgorithm = &hashAlgorithmFromDigest
+	}
+
+	if hashAlgorithmFromDigest != *hashAlgorithm {
 		// TODO use log
 		fmt.Printf("found different hash algorithm in signed attr %s\n", hashAlgorithmFromDigest.String())
 		if _, ok := types.IsValidHashAlgorithm(hashAlgorithmFromDigest.String()); ok {
 			fmt.Printf("changing hash algorithm from %s to %s\n", hashAlgorithm.String(), hashAlgorithmFromDigest.String())
-			hashAlgorithm = hashAlgorithmFromDigest
+			hashAlgorithm = &hashAlgorithmFromDigest
 		}
 	}
 
-	h := types.GeneralHash(hashAlgorithm)
+	h := types.GeneralHash(*hashAlgorithm)
 	h.Write(encapsulatedContent)
 	d := h.Sum(nil)
 
