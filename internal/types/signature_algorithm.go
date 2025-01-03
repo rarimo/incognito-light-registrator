@@ -62,11 +62,17 @@ func verifyECDSA(data, sig []byte, publicKey *ecdsa.PublicKey) error {
 	}
 
 	// Handle raw (r || s) signature format
-	if len(sig) != 64 {
-		return fmt.Errorf("ECDSA signature length is not 64, but %d, with key %s", len(sig), publicKey.Curve.Params().Name)
+	var index int
+	switch len(sig) {
+	case 64:
+		index = 32
+	case 56:
+		index = 28
+	default:
+		return fmt.Errorf("ECDSA signature length is not 64 or 56, but %d, with key %s", len(sig), publicKey.Curve.Params().Name)
 	}
 
-	r, s := new(big.Int).SetBytes(sig[:32]), new(big.Int).SetBytes(sig[32:])
+	r, s := new(big.Int).SetBytes(sig[:index]), new(big.Int).SetBytes(sig[index:])
 	if ecdsa.Verify(publicKey, data, r, s) {
 		return nil
 	}
