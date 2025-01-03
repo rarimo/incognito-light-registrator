@@ -6,6 +6,7 @@ import (
 	"encoding/asn1"
 	"encoding/hex"
 	"encoding/pem"
+	errors3 "errors"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -414,44 +415,64 @@ func validateSignedAttributes(
 		return errors.New("signed attributes amount is 0")
 	}
 
-	digestAttr := types.DigestAttribute{}
-	if _, err := asn1.Unmarshal(signedAttributesASN1[len(signedAttributesASN1)-1].FullBytes, &digestAttr); err != nil {
-		return errors.Wrap(err, "failed to unmarshal ASN1")
-	}
-
-	if len(digestAttr.Digest) == 0 {
-		return errors.New("signed attributes digest values amount is 0")
-	}
-
-	hashAlgorithmFromDigest := types.HashAlgorithmFromSize(len(digestAttr.Digest[0].Bytes))
-	if hashAlgorithm == nil {
-		fmt.Printf("passed hash algorithm is nil, using from signed attr: %s\n", hashAlgorithmFromDigest.String())
-		hashAlgorithm = &hashAlgorithmFromDigest
-	}
-
-	if hashAlgorithmFromDigest != *hashAlgorithm {
-		// TODO use log
-		fmt.Printf("found different hash algorithm in signed attr %s\n", hashAlgorithmFromDigest.String())
-		if _, ok := types.IsValidHashAlgorithm(hashAlgorithmFromDigest.String()); ok {
-			fmt.Printf("changing hash algorithm from %s to %s\n", hashAlgorithm.String(), hashAlgorithmFromDigest.String())
-			*hashAlgorithm = hashAlgorithmFromDigest
+	allErr := make([]error, 0, 2)
+	// Some countries put encapsulated content hash in the middle of signed attr
+	// but the most put as last value, so we start from the end
+	for i := len(signedAttributesASN1) - 1; i >= 0; i-- {
+		digestAttr := types.DigestAttribute{}
+		if _, err := asn1.Unmarshal(signedAttributesASN1[i].FullBytes, &digestAttr); err != nil {
+			allErr = append(allErr, errors.Wrap(err, "failed to unmarshal ASN1"))
+			continue
 		}
-	}
 
-	h := types.GeneralHash(*hashAlgorithm)
-	h.Write(encapsulatedContent)
-	d := h.Sum(nil)
+		if len(digestAttr.Digest) == 0 {
+			allErr = append(allErr, errors.New("signed attributes digest values amount is 0"))
+			continue
+		}
 
-	if !bytes.Equal(digestAttr.Digest[0].Bytes, d) {
-		return errors.From(
+		// we cannot hash some rubbish because it allows to pass illegal encapsulated content
+		if !digestAttr.ID.Equal(asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 4}) {
+			allErr = append(allErr, errors.From(errors.New("field is not message digest"), logan.F{
+				"oid": digestAttr.ID,
+			}))
+			continue
+		}
+
+		maybeHash := digestAttr.Digest[0].Bytes
+		hashAlgorithmFromDigest := types.HashAlgorithmFromSize(len(maybeHash))
+		if hashAlgorithm == nil {
+			fmt.Printf("passed hash algorithm is nil, using from signed attr: %s\n", hashAlgorithmFromDigest.String())
+			hashAlgorithm = &hashAlgorithmFromDigest
+		}
+
+		if hashAlgorithmFromDigest != *hashAlgorithm {
+			// TODO use log
+			fmt.Printf("found different hash algorithm in signed attr %s\n", hashAlgorithmFromDigest.String())
+			if _, ok := types.IsValidHashAlgorithm(hashAlgorithmFromDigest.String()); ok {
+				fmt.Printf("changing hash algorithm from %s to %s\n", hashAlgorithm.String(), hashAlgorithmFromDigest.String())
+				*hashAlgorithm = hashAlgorithmFromDigest
+			}
+		}
+
+		h := types.GeneralHash(*hashAlgorithm)
+		h.Write(encapsulatedContent)
+		d := h.Sum(nil)
+
+		if bytes.Equal(maybeHash, d) {
+			return nil
+		}
+
+		allErr = append(allErr, errors.From(
 			errors.New("digest values are not equal"), logan.F{
-				"signed_attributes":    hex.EncodeToString(digestAttr.Digest[0].Bytes),
+				"maybe_hash":           hex.EncodeToString(maybeHash),
+				"signed_attributes":    hex.EncodeToString(signedAttributes),
 				"content_hash":         hex.EncodeToString(d),
 				"encapsulated_content": hex.EncodeToString(encapsulatedContent),
 			},
-		)
+		))
 	}
-	return nil
+
+	return errors3.Join(allErr...)
 }
 
 func verifySignature(
