@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"encoding/asn1"
+	"fmt"
 	"hash"
 	"math/big"
 
@@ -62,7 +63,7 @@ func verifyECDSA(data, sig []byte, publicKey *ecdsa.PublicKey) error {
 
 	// Handle raw (r || s) signature format
 	if len(sig) != 64 {
-		return errors.New("invalid ECDSA signature length")
+		return fmt.Errorf("ECDSA signature length is not 64, but %d, with key %s", len(sig), publicKey.Curve.Params().Name)
 	}
 
 	r, s := new(big.Int).SetBytes(sig[:32]), new(big.Int).SetBytes(sig[32:])
