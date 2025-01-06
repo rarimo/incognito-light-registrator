@@ -350,7 +350,7 @@ func verifySod(
 		}
 	}
 
-	signedAttrHash, err := verifySignature(signature, cert, signedAttributes, *algorithmPair)
+	signedAttrHash, err := verifySignatureIterated(signature, cert, signedAttributes, *algorithmPair)
 	if err != nil {
 		unwrappedErr := errors2.Unwrap(err)
 		if errors2.Is(unwrappedErr, types.ErrInvalidPublicKey{}) {
