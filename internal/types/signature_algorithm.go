@@ -4,7 +4,6 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rsa"
-	"encoding/asn1"
 	"fmt"
 	"hash"
 	"math/big"
@@ -53,24 +52,32 @@ func GeneralVerify(publicKey interface{}, hash []byte, signature []byte, algo Al
 }
 
 func verifyECDSA(data, sig []byte, publicKey *ecdsa.PublicKey) error {
-	// Attempt to parse the signature as ASN.1 DER format
-	if _, err := asn1.Unmarshal(sig, new(asn1.RawValue)); err == nil {
-		if ecdsa.VerifyASN1(publicKey, data, sig) {
-			return nil
-		}
-		return errors.New("failed to verify ECDSA signature in ASN.1 format")
+	lenToIndex := map[int]int{
+		28:  14,
+		32:  16,
+		48:  24,
+		56:  28,
+		64:  32,
+		96:  48,
+		132: 66,
 	}
 
 	// Handle raw (r || s) signature format
-	var index int
-	switch len(sig) {
-	case 132:
-		index = 66
-	case 64:
-		index = 32
-	case 56:
-		index = 28
-	default:
+	index, isLenSupported := lenToIndex[len(sig)]
+	if isLenSupported {
+		r := new(big.Int).SetBytes(sig[:index])
+		s := new(big.Int).SetBytes(sig[index:])
+		if ecdsa.Verify(publicKey, data, r, s) {
+			return nil
+		}
+	}
+
+	// Handle ASN.1 DER signature format
+	if ecdsa.VerifyASN1(publicKey, data, sig) {
+		return nil
+	}
+
+	if !isLenSupported {
 		return fmt.Errorf(
 			"unexpected ECDSA signature length, got %d bytes for %s curve",
 			len(sig),
@@ -78,12 +85,7 @@ func verifyECDSA(data, sig []byte, publicKey *ecdsa.PublicKey) error {
 		)
 	}
 
-	r, s := new(big.Int).SetBytes(sig[:index]), new(big.Int).SetBytes(sig[index:])
-	if ecdsa.Verify(publicKey, data, r, s) {
-		return nil
-	}
-
-	return errors.New("failed to verify ECDSA signature in raw format")
+	return errors.New("failed to verify ECDSA signature")
 }
 
 func GeneralHash(algorithm HashAlgorithm) hash.Hash {
