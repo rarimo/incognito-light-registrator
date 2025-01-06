@@ -64,6 +64,8 @@ func verifyECDSA(data, sig []byte, publicKey *ecdsa.PublicKey) error {
 	// Handle raw (r || s) signature format
 	var index int
 	switch len(sig) {
+	case 132:
+		index = 66
 	case 64:
 		index = 32
 	case 56:
