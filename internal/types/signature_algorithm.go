@@ -59,6 +59,7 @@ func verifyECDSA(data, sig []byte, publicKey *ecdsa.PublicKey) error {
 		56:  28,
 		64:  32,
 		96:  48,
+		128: 64,
 		132: 66,
 	}
 
