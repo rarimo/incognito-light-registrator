@@ -12,7 +12,7 @@ const (
 	SHA512
 )
 
-var hashAlgorithmMap = map[string]HashAlgorithm{
+var HashAlgorithmMap = map[string]HashAlgorithm{
 	"SHA1":   SHA1,
 	"SHA224": SHA224,
 	"SHA256": SHA256,
@@ -46,7 +46,7 @@ func (h HashAlgorithm) String() string {
 }
 
 func HashAlgorithmFromString(alg string) HashAlgorithm {
-	h, ok := hashAlgorithmMap[strings.ToUpper(alg)]
+	h, ok := HashAlgorithmMap[strings.ToUpper(alg)]
 	if !ok {
 		return HashAlgorithm(0)
 	}
@@ -62,7 +62,7 @@ func HashAlgorithmFromSize(size int) HashAlgorithm {
 }
 
 func IsValidHashAlgorithm(alg string) (HashAlgorithm, bool) {
-	h, ok := hashAlgorithmMap[alg]
+	h, ok := HashAlgorithmMap[alg]
 	return h, ok
 }
 
