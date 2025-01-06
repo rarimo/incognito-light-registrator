@@ -23,6 +23,7 @@ import (
 	"github.com/rarimo/passport-identity-provider/internal/data"
 	"github.com/rarimo/passport-identity-provider/internal/types"
 	"github.com/rarimo/passport-identity-provider/internal/utils"
+	"gitlab.com/distributed_lab/logan/v3"
 
 	"github.com/rarimo/certificate-transparency-go/x509"
 	"github.com/rarimo/passport-identity-provider/internal/service/api"
