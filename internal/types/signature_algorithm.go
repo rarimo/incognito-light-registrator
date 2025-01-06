@@ -71,7 +71,11 @@ func verifyECDSA(data, sig []byte, publicKey *ecdsa.PublicKey) error {
 	case 56:
 		index = 28
 	default:
-		return fmt.Errorf("ECDSA signature length is not 64 or 56, but %d, with key %s", len(sig), publicKey.Curve.Params().Name)
+		return fmt.Errorf(
+			"unexpected ECDSA signature length, got %d bytes for %s curve",
+			len(sig),
+			publicKey.Curve.Params().Name,
+		)
 	}
 
 	r, s := new(big.Int).SetBytes(sig[:index]), new(big.Int).SetBytes(sig[index:])
