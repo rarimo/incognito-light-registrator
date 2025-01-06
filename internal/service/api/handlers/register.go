@@ -44,7 +44,8 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.WithField("sod", req.Data.Attributes.DocumentSod).Debug("request started")
+	rawSod, _ := json.Marshal(req.Data.Attributes.DocumentSod)
+	log.WithField("sod", rawSod).Debug("request started")
 
 	algorithmPair := types.AlgorithmPair{
 		DgHashAlgorithm:    types.HashAlgorithmFromString(req.Data.Attributes.DocumentSod.HashAlgorithm),
