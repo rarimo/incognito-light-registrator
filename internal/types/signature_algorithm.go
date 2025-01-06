@@ -21,8 +21,9 @@ func (e ErrInvalidPublicKey) Error() string {
 
 // AlgorithmPair defines a hash and signature algorithm combination.
 type AlgorithmPair struct {
-	DgHashAlgorithm   HashAlgorithm
-	SignedAttrHashAlg HashAlgorithm
+	DgHashAlgorithm        HashAlgorithm
+	SignedAttrHashAlg      HashAlgorithm
+	SignatureDigestHashAlg HashAlgorithm
 	SignatureAlgorithm
 }
 

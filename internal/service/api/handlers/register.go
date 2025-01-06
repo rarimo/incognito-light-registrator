@@ -13,6 +13,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/google/jsonapi"
 	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/iden3/go-rapidsnark/verifier"
@@ -22,8 +23,6 @@ import (
 	"github.com/rarimo/passport-identity-provider/internal/types"
 	"github.com/rarimo/passport-identity-provider/internal/utils"
 	"gitlab.com/distributed_lab/logan/v3"
-
-	validation "github.com/go-ozzo/ozzo-validation/v4"
 
 	"github.com/rarimo/certificate-transparency-go/x509"
 	"github.com/rarimo/passport-identity-provider/internal/service/api"
@@ -45,9 +44,10 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	algorithmPair := types.AlgorithmPair{
-		DgHashAlgorithm:    types.HashAlgorithmFromString(req.Data.Attributes.DocumentSod.HashAlgorithm),
-		SignedAttrHashAlg:  types.HashAlgorithmFromString(req.Data.Attributes.DocumentSod.HashAlgorithm),
-		SignatureAlgorithm: types.SignatureAlgorithmFromString(req.Data.Attributes.DocumentSod.SignatureAlgorithm),
+		DgHashAlgorithm:        types.HashAlgorithmFromString(req.Data.Attributes.DocumentSod.HashAlgorithm),
+		SignedAttrHashAlg:      types.HashAlgorithmFromString(req.Data.Attributes.DocumentSod.HashAlgorithm),
+		SignatureDigestHashAlg: types.HashAlgorithmFromString(req.Data.Attributes.DocumentSod.HashAlgorithm),
+		SignatureAlgorithm:     types.SignatureAlgorithmFromString(req.Data.Attributes.DocumentSod.SignatureAlgorithm),
 	}
 
 	documentSOD := data.DocumentSOD{
@@ -350,7 +350,7 @@ func verifySod(
 		}
 	}
 
-	signedAttrHash, err := verifySignature(signature, cert, signedAttributes, *algorithmPair)
+	signedAttrHash, err := verifySignatureIterated(signature, cert, signedAttributes, *algorithmPair)
 	if err != nil {
 		unwrappedErr := errors2.Unwrap(err)
 		if errors2.Is(unwrappedErr, types.ErrInvalidPublicKey{}) {
@@ -481,7 +481,7 @@ func verifySignature(
 	signedAttributes []byte,
 	algorithmPair types.AlgorithmPair,
 ) ([]byte, error) {
-	h := types.GeneralHash(algorithmPair.SignedAttrHashAlg)
+	h := types.GeneralHash(algorithmPair.SignatureDigestHashAlg)
 	h.Write(signedAttributes)
 	d := h.Sum(nil)
 
@@ -490,6 +490,48 @@ func verifySignature(
 	}
 
 	return d, nil
+}
+
+func verifySignatureIterated(
+	signature []byte,
+	cert *x509.Certificate,
+	signedAttributes []byte,
+	algorithmPair types.AlgorithmPair,
+) ([]byte, error) {
+	// Default flow to verify signature
+	errs := make([]error, 0, len(types.HashAlgorithmMap))
+	digest, err := verifySignature(signature, cert, signedAttributes, algorithmPair)
+	if err == nil {
+		return digest, nil
+	}
+
+	errs = append(errs, errors.From(err, logan.F{
+		"hash_alg":  algorithmPair.SignatureDigestHashAlg.String(),
+		"signature": algorithmPair.SignatureAlgorithm.String(),
+	}))
+
+	// Workaround to handle signature digest hash algorithm different from specified in request
+	for name, algorithm := range types.HashAlgorithmMap {
+		if algorithm == algorithmPair.SignatureDigestHashAlg {
+			continue
+		}
+
+		algo := algorithmPair
+		algo.SignatureDigestHashAlg = algorithm
+		digest, err = verifySignature(signature, cert, signedAttributes, algo)
+		if err == nil {
+			// TODO use logger
+			fmt.Printf("found suitable digest hash algorithm for signature %s instead %s\n", name, algorithmPair.SignatureDigestHashAlg.String())
+			return digest, nil
+		}
+
+		errs = append(errs, errors.From(err, logan.F{
+			"hash_alg":  name,
+			"signature": algorithmPair.SignatureAlgorithm.String(),
+		}))
+	}
+
+	return nil, errors3.Join(errs...)
 }
 
 func validateCert(cert *x509.Certificate, masterCerts *x509.CertPool, disableTimeChecks, disableNameChecks bool) error {
