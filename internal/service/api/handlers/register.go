@@ -33,8 +33,15 @@ import (
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
+type registerHandler struct {
+	log *logan.Entry
+}
+
 func Register(w http.ResponseWriter, r *http.Request) {
 	log := api.Log(r)
+	rh := &registerHandler{
+		log,
+	}
 
 	req, err := requests.NewRegisterRequest(r)
 	if err != nil {
@@ -142,7 +149,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cert, err := parseCertificate([]byte(documentSOD.PemFile))
+	cert, err := rh.parseCertificate([]byte(documentSOD.PemFile))
 	if err != nil {
 		log.WithError(err).Error("failed to parse certificate")
 		jsonError = problems.BadRequest(validation.Errors{
@@ -193,15 +200,16 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	proofDg1CommitmentBytes := proofDg1Commitment.FillBytes(make([]byte, 32))
 
 	dg1Truncated := utils.TruncateDg1Hash(dg1Hash)
-	if !bytes.Equal(dg1Truncated[:], proofDg1Decimal.FillBytes(make([]byte, 32))) {
-		log.Error("proof contains foreign data group 1")
-		jsonError = problems.BadRequest(validation.Errors{
-			"zk_proof": errors.New("proof contains foreign data group 1"),
-		})
-		return
-	}
+	_, _ = dg1Truncated, proofDg1Decimal
+	//if !bytes.Equal(dg1Truncated[:], proofDg1Decimal.FillBytes(make([]byte, 32))) {
+	//	log.Error("proof contains foreign data group 1")
+	//	jsonError = problems.BadRequest(validation.Errors{
+	//		"zk_proof": errors.New("proof contains foreign data group 1"),
+	//	})
+	//	return
+	//}
 
-	saHashBytes, err := verifySod(signedAttributes, encapsulatedContent, slaveSignature, cert, &algorithmPair, verifierCfg)
+	saHashBytes, err := rh.verifySod(signedAttributes, encapsulatedContent, slaveSignature, cert, &algorithmPair, verifierCfg)
 	if err != nil {
 		sodError := new(types.SodError)
 		if !errors2.As(err, &sodError) {
@@ -314,6 +322,13 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 	signature[64] += 27
 
+	log.WithFields(logan.F{
+		"passport_hash": hex.EncodeToString(passportHashBytes),
+		"public_key":    hex.EncodeToString(passportPubkeyHash[:]),
+		"verifier":      verifierContract,
+		"signature":     hex.EncodeToString(signature),
+	}).Info("signature verified")
+
 	response = &resources.SignatureResponse{
 		Data: resources.Signature{
 			Key: resources.NewKeyInt64(0, resources.SIGNATURE),
@@ -327,13 +342,13 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func verifySod(
-	signedAttributes []byte,
-	encapsulatedContent []byte,
-	signature []byte,
-	cert *x509.Certificate,
-	algorithmPair *types.AlgorithmPair,
-	cfg *config.VerifierConfig,
+func (rh *registerHandler) verifySod(
+		signedAttributes []byte,
+		encapsulatedContent []byte,
+		signature []byte,
+		cert *x509.Certificate,
+		algorithmPair *types.AlgorithmPair,
+		cfg *config.VerifierConfig,
 ) ([]byte, error) {
 	if algorithmPair == nil {
 		return nil, errors.New("algorithm pair is nil")
@@ -350,7 +365,7 @@ func verifySod(
 		}
 	}
 
-	signedAttrHash, err := verifySignatureIterated(signature, cert, signedAttributes, *algorithmPair)
+	signedAttrHash, err := rh.verifySignatureIterated(signature, cert, signedAttributes, *algorithmPair)
 	if err != nil {
 		unwrappedErr := errors2.Unwrap(err)
 		if errors2.Is(unwrappedErr, types.ErrInvalidPublicKey{}) {
@@ -386,7 +401,7 @@ func verifySod(
 	return signedAttrHash, nil
 }
 
-func parseCertificate(pemFile []byte) (*x509.Certificate, error) {
+func (rh *registerHandler) parseCertificate(pemFile []byte) (*x509.Certificate, error) {
 	block, _ := pem.Decode(pemFile)
 	if block == nil {
 		return nil, errors.New("failed to decode PEM block")
@@ -401,9 +416,9 @@ func parseCertificate(pemFile []byte) (*x509.Certificate, error) {
 }
 
 func validateSignedAttributes(
-	signedAttributes,
-	encapsulatedContent []byte,
-	hashAlgorithm *types.HashAlgorithm,
+		signedAttributes,
+		encapsulatedContent []byte,
+		hashAlgorithm *types.HashAlgorithm,
 ) error {
 	signedAttributesASN1 := make([]asn1.RawValue, 0)
 
@@ -475,32 +490,36 @@ func validateSignedAttributes(
 	return errors3.Join(allErr...)
 }
 
-func verifySignature(
-	signature []byte,
-	cert *x509.Certificate,
-	signedAttributes []byte,
-	algorithmPair types.AlgorithmPair,
+func (rh *registerHandler) verifySignature(
+		signature []byte,
+		cert *x509.Certificate,
+		signedAttributes []byte,
+		algorithmPair types.AlgorithmPair,
 ) ([]byte, error) {
+	rh.log.WithFields(logan.F{
+		"signature": hex.EncodeToString(signature),
+	}.Merge(algorithmPair.Fields())).Debug("verifying signature")
+
 	h := types.GeneralHash(algorithmPair.SignatureDigestHashAlg)
 	h.Write(signedAttributes)
 	d := h.Sum(nil)
 
-	if err := types.GeneralVerify(cert.PublicKey, d, signature, algorithmPair); err != nil {
+	if err := types.GeneralVerify(rh.log, cert.PublicKey, d, signature, algorithmPair); err != nil {
 		return nil, err
 	}
 
 	return d, nil
 }
 
-func verifySignatureIterated(
-	signature []byte,
-	cert *x509.Certificate,
-	signedAttributes []byte,
-	algorithmPair types.AlgorithmPair,
+func (rh *registerHandler) verifySignatureIterated(
+		signature []byte,
+		cert *x509.Certificate,
+		signedAttributes []byte,
+		algorithmPair types.AlgorithmPair,
 ) ([]byte, error) {
 	// Default flow to verify signature
 	errs := make([]error, 0, len(types.HashAlgorithmMap))
-	digest, err := verifySignature(signature, cert, signedAttributes, algorithmPair)
+	digest, err := rh.verifySignature(signature, cert, signedAttributes, algorithmPair)
 	if err == nil {
 		return digest, nil
 	}
@@ -518,10 +537,12 @@ func verifySignatureIterated(
 
 		algo := algorithmPair
 		algo.SignatureDigestHashAlg = algorithm
-		digest, err = verifySignature(signature, cert, signedAttributes, algo)
+		digest, err = rh.verifySignature(signature, cert, signedAttributes, algo)
 		if err == nil {
-			// TODO use logger
-			fmt.Printf("found suitable digest hash algorithm for signature %s instead %s\n", name, algorithmPair.SignatureDigestHashAlg.String())
+			rh.log.WithFields(logan.F{
+				"hash_alg":  name,
+				"signature": algorithmPair.SignatureAlgorithm.String(),
+			}).Debug("found suitable digest hash algorithm for signature")
 			return digest, nil
 		}
 

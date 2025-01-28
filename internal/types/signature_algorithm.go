@@ -8,6 +8,8 @@ import (
 	"hash"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"gitlab.com/distributed_lab/logan/v3"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
@@ -24,28 +26,55 @@ type AlgorithmPair struct {
 	DgHashAlgorithm        HashAlgorithm
 	SignedAttrHashAlg      HashAlgorithm
 	SignatureDigestHashAlg HashAlgorithm
-	SignatureAlgorithm
+	SignatureAlgorithm     SignatureAlgorithm
 }
 
-func GeneralVerify(publicKey interface{}, hash []byte, signature []byte, algo AlgorithmPair) error {
+func (a AlgorithmPair) Fields() map[string]interface{} {
+	return map[string]interface{}{
+		"dg_hash_algorithm":         a.DgHashAlgorithm.String(),
+		"signed_attr_hash_alg":      a.SignedAttrHashAlg.String(),
+		"signature_digest_hash_alg": a.SignatureDigestHashAlg.String(),
+		"signature_algorithm":       a.SignatureAlgorithm.String(),
+	}
+}
+
+func GeneralVerify(log *logan.Entry, publicKey interface{}, hash []byte, signature []byte, algo AlgorithmPair) error {
 	switch algo.SignatureAlgorithm {
 	case RSA:
 		rsaKey, ok := publicKey.(*rsa.PublicKey)
 		if !ok {
 			return ErrInvalidPublicKey{Expected: algo.SignatureAlgorithm}
 		}
+
+		log.WithFields(logan.F{
+			"hash":      hexutil.Encode(hash),
+			"signature": hexutil.Encode(signature),
+		}).Debug("verifying RSA signature")
+
 		return rsa.VerifyPKCS1v15(rsaKey, getCryptoHash(algo.SignedAttrHashAlg), hash, signature)
 	case RSAPSS:
 		rsaKey, ok := publicKey.(*rsa.PublicKey)
 		if !ok {
 			return ErrInvalidPublicKey{Expected: algo.SignatureAlgorithm}
 		}
+
+		log.WithFields(logan.F{
+			"hash":      hexutil.Encode(hash),
+			"signature": hexutil.Encode(signature),
+		}).Debug("verifying RSA-PSS signature")
+
 		return rsa.VerifyPSS(rsaKey, getCryptoHash(algo.SignedAttrHashAlg), hash, signature, nil)
 	case ECDSA:
 		ecdsaKey, ok := publicKey.(*ecdsa.PublicKey)
 		if !ok {
 			return ErrInvalidPublicKey{Expected: algo.SignatureAlgorithm}
 		}
+
+		log.WithFields(logan.F{
+			"hash":      hexutil.Encode(hash),
+			"signature": hexutil.Encode(signature),
+		}).Debug("verifying ECDSA signature")
+
 		return verifyECDSA(hash, signature, ecdsaKey)
 	default:
 		return errors.New("unsupported signature algorithm")
