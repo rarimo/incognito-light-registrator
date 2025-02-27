@@ -26,6 +26,9 @@ func (s *service) router() chi.Router {
 		r.Route("/v1", func(r chi.Router) {
 			r.Post("/register", handlers.Register)
 		})
+		r.Route("/v2", func(r chi.Router) {
+			r.Post("/register-certificate", handlers.RegisterCertificate)
+		})
 	})
 
 	return r

@@ -1,0 +1,25 @@
+allOf:
+  - $ref: '#/components/schemas/SignatureCertKey'
+  - type: object
+    required:
+      - attributes
+    properties:
+      attributes:
+        type: object
+        required:
+          - public_key
+          - signature
+          - master_cert_public_key
+        properties:
+          public_key:
+            type: string
+            example: "0x7768792064696420796F75206576656E206465636F6465642069743F"
+            description: PublicKey for signature validation.
+          master_cert_public_key:
+            type: string
+            example: "0x7768792064696420796F75206576656E206465636F6465642069743F"
+            description: Public key of the ICAO root certificate that signed the provided certificate.
+          signature:
+            type: string
+            example: "0x7768792064696420796F75206576656E206465636F6465642069743F"
+            description: ECDSA signature of the abi encoded signed data
