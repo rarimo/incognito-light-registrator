@@ -7,18 +7,13 @@ allOf:
       attributes:
         type: object
         required:
-          - public_key
+          - public_key_hash
           - signature
-          - master_cert_public_key
         properties:
-          public_key:
+          public_key_hash:
             type: string
             example: "0x7768792064696420796F75206576656E206465636F6465642069743F"
-            description: PublicKey for signature validation.
-          master_cert_public_key:
-            type: string
-            example: "0x7768792064696420796F75206576656E206465636F6465642069743F"
-            description: Public key of the ICAO root certificate that signed the provided certificate.
+            description: Poseidon hash of public key parsed from PEM certificate.
           signature:
             type: string
             example: "0x7768792064696420796F75206576656E206465636F6465642069743F"

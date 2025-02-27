@@ -73,11 +73,11 @@ func TruncateHexPrefix(hexString *string) *string {
 }
 
 func BuildSignedCertData(
-	publicKeyBytes []byte,
+	publicKeyHashBytes [32]byte,
 ) ([]byte, error) {
 	return abiEncodePacked(
 		types.RegistrationSimplePrefix,
-		publicKeyBytes[:],
+		publicKeyHashBytes[:],
 	)
 }
 
@@ -112,7 +112,7 @@ func ExtractPublicKey(dg15 []byte) (interface{}, [32]byte, error) {
 		if err != nil {
 			return k, zeroHash, err
 		}
-		return k, bigIntTo32Bytes(h), nil
+		return k, BigIntTo32Bytes(h), nil
 	case *rsa.PublicKey:
 		// RSA Key:
 		// pubKey = Poseidon5(200bit, 200bit, 200bit, 200bit, 224bit) = 1024 bits total
@@ -146,7 +146,7 @@ func ExtractPublicKey(dg15 []byte) (interface{}, [32]byte, error) {
 		if err != nil {
 			return k, zeroHash, err
 		}
-		return k, bigIntTo32Bytes(h), nil
+		return k, BigIntTo32Bytes(h), nil
 	default:
 		return nil, zeroHash, nil
 	}
@@ -239,7 +239,7 @@ func extractEcPublicKey(dg15 []byte) (*ecdsa.PublicKey, error) {
 	return pubKey, nil
 }
 
-func bigIntTo32Bytes(num *big.Int) [32]byte {
+func BigIntTo32Bytes(num *big.Int) [32]byte {
 	var out [32]byte
 	if num == nil {
 		return out
