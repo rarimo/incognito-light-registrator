@@ -34,13 +34,13 @@ func GeneralVerify(publicKey interface{}, hash []byte, signature []byte, algo Al
 		if !ok {
 			return ErrInvalidPublicKey{Expected: algo.SignatureAlgorithm}
 		}
-		return rsa.VerifyPKCS1v15(rsaKey, getCryptoHash(algo.SignedAttrHashAlg), hash, signature)
+		return rsa.VerifyPKCS1v15(rsaKey, getCryptoHash(algo.SignatureDigestHashAlg), hash, signature)
 	case RSAPSS:
 		rsaKey, ok := publicKey.(*rsa.PublicKey)
 		if !ok {
 			return ErrInvalidPublicKey{Expected: algo.SignatureAlgorithm}
 		}
-		return rsa.VerifyPSS(rsaKey, getCryptoHash(algo.SignedAttrHashAlg), hash, signature, nil)
+		return rsa.VerifyPSS(rsaKey, getCryptoHash(algo.SignatureDigestHashAlg), hash, signature, nil)
 	case ECDSA:
 		ecdsaKey, ok := publicKey.(*ecdsa.PublicKey)
 		if !ok {
