@@ -117,7 +117,8 @@ func TestExtractFirstNBits(t *testing.T) {
 		{sha1hash, 158, append(sha1hash[:19], 0x98)},
 		{sha1hash, 159, append(sha1hash[:19], 0x98)},
 		{sha1hash, 160, sha1hash},
-		{sha1hash, 200, append(sha1hash, 0x00, 0x00, 0x00, 0x00, 0x00)}, // pad to 25 bytes
+		{sha1hash, 200, append(sha1hash, bytes.Repeat([]byte{0x00}, 5)...)}, // pad to 25 bytes
+		{sha1hash, 252, append(sha1hash, bytes.Repeat([]byte{0x00}, 12)...)},
 	}
 
 	for _, tc := range cases {
@@ -170,12 +171,7 @@ func TestReverseBits(t *testing.T) {
 			0x5F, 0xF7, 0x7D, 0xB5, 0x7B,
 		}},
 
-		{[]byte{
-			0x01, 0x01, 0x01, 0x01, 0x01,
-			0x01, 0x01, 0x01, 0x01, 0x01,
-			0x01, 0x01, 0x01, 0x01, 0x01,
-			0x01, 0x01, 0x01, 0x01, 0x01,
-		}, bytes.Repeat([]byte{0x80}, 20)}, // all 0x01 flipped → 0x80
+		{bytes.Repeat([]byte{0x01}, 20), bytes.Repeat([]byte{0x80}, 20)}, // all 0x01 flipped → 0x80
 
 		{bytes.Repeat([]byte{0x0F}, 32), bytes.Repeat([]byte{0xF0}, 32)}, // 32-byte input
 
