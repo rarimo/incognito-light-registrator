@@ -1,0 +1,20 @@
+allOf:
+  - $ref: '#/components/schemas/SignatureCertKey'
+  - type: object
+    required:
+      - attributes
+    properties:
+      attributes:
+        type: object
+        required:
+          - public_key_hash
+          - signature
+        properties:
+          public_key_hash:
+            type: string
+            example: "0x7768792064696420796F75206576656E206465636F6465642069743F"
+            description: Poseidon hash of public key parsed from PEM certificate.
+          signature:
+            type: string
+            example: "0x7768792064696420796F75206576656E206465636F6465642069743F"
+            description: ECDSA signature of the abi encoded signed data

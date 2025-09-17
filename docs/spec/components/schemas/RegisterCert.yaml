@@ -1,0 +1,15 @@
+allOf:
+  - $ref: '#/components/schemas/RegisterCertKey'
+  - type: object
+    x-go-is-request: true
+    required:
+      - attributes
+    properties:
+      attributes:
+        type: object
+        required:
+          - pem_file
+        properties:
+          pem_file:
+            type: string
+            description: PEM file of the certificate to be validated
