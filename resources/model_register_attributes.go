@@ -11,3 +11,9 @@ type RegisterAttributes struct {
 	// Zero-knowledge proof with dg1 public input
 	ZkProof types.ZKProof `json:"zk_proof"`
 }
+
+type RegisterIDAttributes struct {
+	DocumentSod DocumentSod `json:"document_sod"`
+	// Zero-knowledge proof for noir
+	ZkProof string `json:"zk_proof"`
+}

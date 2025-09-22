@@ -34,3 +34,7 @@ cop:
   upstream: "http://..."
   service_name: identity-provider-service
   service_port: 80
+
+keys:
+  signature_key: "01077020101042022d0c137d5c1443b945b305963951c0dd20a03a710bf387f0"
+
