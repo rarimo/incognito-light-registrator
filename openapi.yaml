@@ -47,6 +47,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Errors'
+  /integrations/incognito-light-registrator/v1/registerID:
+    post:
+      tags:
+        - Register
+      summary: RegisterID
+      operationId: registerID
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - data
+              properties:
+                data:
+                  $ref: '#/components/schemas/RegisterID'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterIDResponse'
+        '400':
+          description: Bad Request Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors'
+        '500':
+          description: Internal Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors'
 components:
   schemas:
     DocumentSod:
@@ -149,6 +184,24 @@ components:
                   type: object
                   format: types.ZKProof
                   description: Zero-knowledge proof with dg1 public input
+                document_sod:
+                  $ref: '#/components/schemas/DocumentSod'
+    RegisterID:
+      allOf:
+        - $ref: '#/components/schemas/RegisterKey'
+        - type: object
+          required:
+            - attributes
+          properties:
+            attributes:
+              type: object
+              required:
+                - zk_proof
+                - document_sod
+              properties:
+                zk_proof:
+                  type: string
+                  description: Zero-knowledge proof in base64 format.
                 document_sod:
                   $ref: '#/components/schemas/DocumentSod'
     RegisterKey:
