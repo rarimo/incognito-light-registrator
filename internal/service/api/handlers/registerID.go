@@ -109,12 +109,15 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	verifierCfg := api.VerifierConfig(r)
+	alg := types.HashAlgorithmFromString(req.Data.Attributes.DocumentSod.HashAlgorithm).BitSize()
 
 	// Verify proof here
 	RunCommand("touch proof.base64")
 	RunCommand("echo " + req.Data.Attributes.ZkProof +" > proof.base64")
 	RunCommand("base64 -D -i proof.base64 > proof")
-	RunCommand("bb verify -s ultra_honk -k ./verification_keys/registerIdentityLight256.vk  -p ./proof -v &> cmd.txt")
+	command := fmt.Sprintf("bb verify -s ultra_honk -k ./verification_keys/registerIdentityLight%d.vk -p ./proof -v &> cmd.txt", alg)
+	RunCommand(command)
+
 	content, err := os.ReadFile("cmd.txt")
     if err != nil {
 		RunCommand("rm proof proof.base64 cmd.txt")
@@ -138,18 +141,9 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 
     pubSignal1 := hexProof[0:32]
     pubSignal2 := hexProof[32:64]
-    // pubSignal3 := hexProof[64:96]
 
     hex1 := hex.EncodeToString(pubSignal1)
     hex2 := hex.EncodeToString(pubSignal2)
-    // hex3 := hex.EncodeToString(pubSignal3)
-
-    // combined := strings.Join([]string{hex1, hex2, hex3}, "\n")
-
-    // err = os.WriteFile("signals.txt", []byte(combined), 0644)
-    // if err != nil {
-    //     log.Fatal("Failed to write signals.txt:", err)
-    // }
 
 
 	signedAttributes, err := hex.DecodeString(documentSOD.SignedAttributes)

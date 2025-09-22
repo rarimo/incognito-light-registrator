@@ -8,22 +8,10 @@ type Register struct {
 	Key
 	Attributes RegisterAttributes `json:"attributes"`
 }
-
-type RegisterID struct {
-	Key
-	Attributes RegisterIDAttributes `json:"attributes"`
-}
-
 type RegisterResponse struct {
 	Data     Register `json:"data"`
 	Included Included `json:"included"`
 }
-
-type RegisterIDResponse struct {
-	Data     RegisterID `json:"data"`
-	Included Included `json:"included"`
-}
-
 
 type RegisterListResponse struct {
 	Data     []Register `json:"data"`

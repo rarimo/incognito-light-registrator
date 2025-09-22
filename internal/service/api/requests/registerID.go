@@ -10,7 +10,7 @@ import (
 	"github.com/rarimo/passport-identity-provider/resources"
 )
 
-func NewRegisterIDRequest(r *http.Request) (request resources.RegisterIDResponse, err error) {
+func NewRegisterIDRequest(r *http.Request) (request resources.RegisterIdResponse, err error) {
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		return request, validation.NewError("err_decode", "failed to unmarshal register request")
 	}
@@ -18,7 +18,7 @@ func NewRegisterIDRequest(r *http.Request) (request resources.RegisterIDResponse
 	return request, validateRegisterID(request)
 }
 
-func validateRegisterID(r resources.RegisterIDResponse) error {
+func validateRegisterID(r resources.RegisterIdResponse) error {
 	return validation.Errors{
 		"/data/attributes/document_sod/signature_algorithm": validation.Validate(
 			r.Data.Attributes.DocumentSod.SignatureAlgorithm,
