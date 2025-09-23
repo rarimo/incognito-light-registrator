@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/google/jsonapi"
+	"github.com/google/uuid"
 	"github.com/iden3/go-iden3-crypto/poseidon"
 	errors2 "github.com/pkg/errors"
 	"github.com/rarimo/passport-identity-provider/internal/data"
@@ -33,6 +34,7 @@ import (
 
 func RegisterID(w http.ResponseWriter, r *http.Request) {
 	log := api.Log(r)
+	requestID := uuid.New().String()
 
 	req, err := requests.NewRegisterIDRequest(r)
 	if err != nil {
@@ -61,6 +63,9 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 		ErrorKind:           nil,
 		Error:               nil,
 	}
+
+	proofFile := fmt.Sprintf("proof%s", requestID)
+	cmdFile := fmt.Sprintf("cmd%s.txt", requestID)
 
 	var response *resources.SignatureResponse
 	var jsonError []*jsonapi.ErrorObject
@@ -106,37 +111,24 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 		if response != nil {
 			ape.Render(w, response)
 		}
+
+		if err := os.Remove(proofFile); err != nil && !os.IsNotExist(err) {
+			log.WithError(err).Errorf("failed to remove file %s", proofFile)
+		}
+		if err := os.Remove(cmdFile); err != nil && !os.IsNotExist(err) {
+			log.WithError(err).Errorf("failed to remove file %s", cmdFile)
+		}
 	}()
 
 	verifierCfg := api.VerifierConfig(r)
-	alg := types.HashAlgorithmFromString(req.Data.Attributes.DocumentSod.HashAlgorithm).BitSize()
-
-	// Verify proof here
-	RunCommand("touch proof.base64")
-	RunCommand("echo " + req.Data.Attributes.ZkProof +" > proof.base64")
-	RunCommand("base64 -D -i proof.base64 > proof")
-	command := fmt.Sprintf("bb verify -s ultra_honk -k ./verification_keys/registerIdentityLight%d.vk -p ./proof -v &> cmd.txt", alg)
-	RunCommand(command)
-
-	content, err := os.ReadFile("cmd.txt")
-    if err != nil {
-		RunCommand("rm proof proof.base64 cmd.txt")
-        return
-    }
-	verified := false
-	if parts := strings.Split(string(content), "verified: "); len(parts) > 1 {
-		verified = strings.TrimSpace(parts[1]) == "1"
-	}
-	RunCommand("rm proof proof.base64 cmd.txt")
-
-	if !verified {
-		return 
-	}
-
 
 	hexProof, err := base64.StdEncoding.DecodeString(req.Data.Attributes.ZkProof)
     if err != nil {
-        log.Fatal("Failed to decode base64:", err)
+        log.WithError(err).Error("failed to decode base64")
+		jsonError = problems.BadRequest(validation.Errors{
+			"zk_proof": err,
+		})
+		return
     }
 
     pubSignal1 := hexProof[0:32]
@@ -342,7 +334,44 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 		jsonError = append(jsonError, problems.InternalError())
 		return
 	}
+	alg := types.HashAlgorithmFromString(req.Data.Attributes.DocumentSod.HashAlgorithm).BitSize()
 
+	decoded, decodingErr := base64.StdEncoding.DecodeString(req.Data.Attributes.ZkProof)
+	if decodingErr != nil {
+		log.WithError(err).Error("failed to decode base64")
+        jsonError = append(jsonError, problems.BadRequest(validation.Errors{
+            "zk_proof": errors.New("proof decoding failed"),
+        })...)
+		return
+	}
+	writingError := os.WriteFile(fmt.Sprintf("proof%s", requestID), decoded, 0644)
+	if writingError != nil {
+		log.WithError(err).Error("failed to write decoded base64")
+        jsonError = append(jsonError, problems.InternalError())
+		return
+	}
+
+	command := fmt.Sprintf("bb verify -s ultra_honk -k ./verification_keys/registerIdentityLight%d.vk -p ./proof%s -v &> cmd%s.txt", alg, requestID, requestID)
+	RunCommand(command)
+
+	content, err := os.ReadFile(fmt.Sprintf("cmd%s.txt", requestID))
+    if err != nil {
+		log.WithError(err).Error("failed to write decoded base64")
+        jsonError = append(jsonError, problems.InternalError())
+        return
+    }
+	verified := false
+	if parts := strings.Split(string(content), "verified: "); len(parts) > 1 {
+		verified = strings.TrimSpace(parts[1]) == "1"
+	}
+
+	if !verified {
+		log.WithError(err).Error("invalid proof")
+        jsonError = append(jsonError, problems.BadRequest(validation.Errors{
+            "zk_proof": errors.New("invalid proof"),
+        })...)
+		return 
+	}
 
 	signature[64] += 27
 
