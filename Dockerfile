@@ -27,7 +27,7 @@ FROM --platform=amd64 alpine:3.9
 
 
 COPY --from=alpine:3.9 /bin/sh /bin/sh
-COPY --from=alpine:3.9 /usr /usr
+#COPY --from=alpine:3.9 /usr /usr
 COPY --from=alpine:3.9 /lib /lib
 
 COPY --from=buildbase /usr/local/bin/bb /usr/local/bin/bb
