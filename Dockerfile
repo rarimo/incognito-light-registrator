@@ -26,12 +26,12 @@ RUN echo $PATH
 FROM --platform=amd64 alpine:3.9
 
 
-COPY --from=alpine:3.9 /bin/sh /bin/sh
+#COPY --from=alpine:3.9 /bin/sh /bin/sh
 #COPY --from=alpine:3.9 /usr /usr
-COPY --from=alpine:3.9 /lib /lib
+#COPY --from=alpine:3.9 /lib /lib
 
-COPY --from=buildbase /usr/local/bin/bb /usr/local/bin/bb
 COPY --from=buildbase /usr/local/bin/incognito-light-registrator /usr/local/bin/incognito-light-registrator
+COPY --from=buildbase /usr/local/bin/bb /usr/local/bin/bb
 COPY --from=buildbase /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=buildbase /go/src/github.com/rarimo/incognito-light-registrator/verification_keys/* /verification_keys/
 COPY --from=buildbase /go/src/github.com/rarimo/incognito-light-registrator/masterList.dev.pem /masterList.dev.pem
