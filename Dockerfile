@@ -11,7 +11,8 @@ RUN git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com"
 RUN git config --global url."https://${CI_JOB_TOKEN}@github.com/".insteadOf https://github.com/
 
 RUN go mod tidy && go mod vendor
-RUN CGO_ENABLED=1 GO111MODULE=on GOOS=linux go build -o /usr/local/bin/incognito-light-registrator /go/src/github.com/rarimo/incognito-light-registrator
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /usr/local/bin/incognito-light-registrator
+
 
 RUN curl -L https://raw.githubusercontent.com/AztecProtocol/aztec-packages/refs/heads/master/barretenberg/bbup/install | bash 
 RUN /root/.bb/bbup -v 0.66.0
@@ -23,12 +24,9 @@ RUN echo $PATH
 
 
 
-FROM --platform=amd64 alpine:3.9
+FROM frolvlad/alpine-glibc:latest
 
-
-#COPY --from=alpine:3.9 /bin/sh /bin/sh
-#COPY --from=alpine:3.9 /usr /usr
-#COPY --from=alpine:3.9 /lib /lib
+RUN apk add --no-cache libc++ libgcc
 
 COPY --from=buildbase /usr/local/bin/incognito-light-registrator /usr/local/bin/incognito-light-registrator
 COPY --from=buildbase /usr/local/bin/bb /usr/local/bin/bb
@@ -37,7 +35,8 @@ COPY --from=buildbase /go/src/github.com/rarimo/incognito-light-registrator/veri
 COPY --from=buildbase /go/src/github.com/rarimo/incognito-light-registrator/masterList.dev.pem /masterList.dev.pem
 
 ENV PATH="/usr/local/bin:${PATH}"
+RUN echo "$(ls -alF /usr/local/bin/)"
+RUN echo "$(bb --version)"
 
-RUN echo "$(/usr/local/bin/bb -v)"
 
 ENTRYPOINT ["/bin/sh", "-c", "which bb && bb -v && exec incognito-light-registrator"]
