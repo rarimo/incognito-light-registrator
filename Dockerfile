@@ -38,6 +38,6 @@ COPY --from=buildbase /go/src/github.com/rarimo/incognito-light-registrator/mast
 
 ENV PATH="/usr/local/bin:${PATH}"
 
-RUN echo "$(bb -v)"
+RUN echo "$(/usr/local/bin/bb -v)"
 
 ENTRYPOINT ["/bin/sh", "-c", "which bb && bb -v && exec incognito-light-registrator"]
