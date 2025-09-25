@@ -143,15 +143,15 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 
 
-	dg1Hash, passportPubkeyHash, passportHashBytes, err := validateAllExceptProof(
+	dg1Hash, passportPubkeyHash, passportHashBytes, validateErr := validateAllExceptProof(
 		addressesCfg,
 		&documentSOD,
-		&jsonError,
 		log,
 		algorithmPair,
 		verifierCfg,
 	)
-	if err != nil {
+	if validateErr != nil {
+		jsonError = validateErr
 		return
 	}
 
@@ -434,163 +434,146 @@ func validateCert(cert *x509.Certificate, masterCerts *x509.CertPool, disableTim
 func validateAllExceptProof(
     addressesCfg config.AddressesConfig,
     documentSOD *data.DocumentSOD,
-    jsonError *[]*jsonapi.ErrorObject,
     log *logan.Entry,
     algorithmPair types.AlgorithmPair,
     verifierCfg *config.VerifierConfig,
-) ([]byte, [32]byte, []byte, error) {
+) ([]byte, [32]byte, []byte, []*jsonapi.ErrorObject) {
+
+    var jsonError []*jsonapi.ErrorObject
+
     signedAttributes, err := hex.DecodeString(documentSOD.SignedAttributes)
     if err != nil {
         log.WithError(err).Error("failed to decode signed attributes")
-        *jsonError = problems.BadRequest(validation.Errors{
+        jsonError = problems.BadRequest(validation.Errors{
             "signed_attributes": err,
         })
-        return nil, [32]byte{}, nil, err
+        return nil, [32]byte{}, nil, jsonError
     }
-
 
     encapsulatedContent, err := hex.DecodeString(documentSOD.EncapsulatedContent)
     if err != nil {
         log.WithError(err).Error("failed to decode encapsulated content")
-        *jsonError = problems.BadRequest(validation.Errors{
+        jsonError = problems.BadRequest(validation.Errors{
             "encapsulated_content": err,
         })
-        return nil, [32]byte{}, nil, err
+        return nil, [32]byte{}, nil, jsonError
     }
-
 
     cert, err := parseCertificate([]byte(documentSOD.PemFile))
     if err != nil {
         log.WithError(err).Error("failed to parse certificate")
-        *jsonError = problems.BadRequest(validation.Errors{
+        jsonError = problems.BadRequest(validation.Errors{
             "pem_file": err,
         })
-        return nil, [32]byte{}, nil, err
+        return nil, [32]byte{}, nil, jsonError
     }
-
 
     slaveSignature, err := hex.DecodeString(documentSOD.Signature)
     if err != nil {
         log.WithError(err).Error("failed to decode slaveSignature")
-        *jsonError = problems.BadRequest(validation.Errors{
+        jsonError = problems.BadRequest(validation.Errors{
             "slaveSignature": err,
         })
-        return nil, [32]byte{}, nil, err
+        return nil, [32]byte{}, nil, jsonError
     }
-
 
     dg1Hash, err := utils.GetDataGroup(encapsulatedContent, 1)
     if err != nil {
         log.WithError(err).Error("failed to get data group 1")
-        *jsonError = append(*jsonError, problems.BadRequest(validation.Errors{
+        jsonError = problems.BadRequest(validation.Errors{
             "encapsulated_content": errors.New("failed to get data group 1"),
-        })...)
-        return nil, [32]byte{}, nil, err
+        })
+        return nil, [32]byte{}, nil, jsonError
     }
-
 
     if dg1Hash == nil {
         log.Error("data group 1 is missing")
-        *jsonError = problems.BadRequest(validation.Errors{
+        jsonError = problems.BadRequest(validation.Errors{
             "encapsulated_content": errors.New("data group 1 is missing"),
         })
-        return nil, [32]byte{}, nil, errors.New("data group 1 is missing")
+        return nil, [32]byte{}, nil, jsonError
     }
-
 
     saHashBytes, err := verifySod(signedAttributes, encapsulatedContent, slaveSignature, cert, &algorithmPair, verifierCfg)
     if err != nil {
         sodError := new(types.SodError)
         if !errors2.As(err, &sodError) {
             log.WithError(err).Error("failed to verify SOD")
-            *jsonError = append(*jsonError, problems.InternalError())
-            return nil, [32]byte{}, nil, err
+            jsonError = append(jsonError, problems.InternalError())
+            return nil, [32]byte{}, nil, jsonError
         }
 
-
         log.WithError(sodError.VerboseError).Error("failed to verify SOD")
-
 
         documentSOD.ErrorKind = sodError.KindPtr()
         documentSOD.Error = sodError.VerboseErrorPtr()
 
-
         if sodError.Details == nil {
-            *jsonError = append(*jsonError, problems.InternalError())
-            return nil, [32]byte{}, nil, err
+            jsonError = append(jsonError, problems.InternalError())
+            return nil, [32]byte{}, nil, jsonError
         }
 
-
-        *jsonError = problems.BadRequest(validation.Errors{
+        jsonError = problems.BadRequest(validation.Errors{
             sodError.Details.Kind.Field(): sodError.Details.Description,
         })
-        return nil, [32]byte{}, nil, err
+        return nil, [32]byte{}, nil, jsonError
     }
-
 
     truncatedSignedAttributes, err := utils.ExtractFirstNBits(saHashBytes, 252)
     if err != nil {
         log.WithError(err).Error("failed to extract bits from signed attributes")
-        *jsonError = append(*jsonError, problems.InternalError())
-        return nil, [32]byte{}, nil, err
+        jsonError = append(jsonError, problems.InternalError())
+        return nil, [32]byte{}, nil, jsonError
     }
-
 
     toBeHashed := []*big.Int{big.NewInt(0).SetBytes(utils.ReverseBits(truncatedSignedAttributes))}
     passportHash, err := poseidon.Hash(toBeHashed)
     if err != nil {
         log.WithError(err).Error("failed to hash signed attributes")
-        *jsonError = append(*jsonError, problems.InternalError())
-        return nil, [32]byte{}, nil, err
+        jsonError = append(jsonError, problems.InternalError())
+        return nil, [32]byte{}, nil, jsonError
     }
 
-
     passportHashBytes := passportHash.FillBytes(make([]byte, 32))
-
 
     dg15Hash, err := utils.GetDataGroup(encapsulatedContent, 15)
     if err != nil {
         log.WithError(err).Error("failed to get data group 15")
-        *jsonError = append(*jsonError, problems.BadRequest(validation.Errors{
+        jsonError = problems.BadRequest(validation.Errors{
             "encapsulated_content": errors.New("failed to get data group 15"),
-        })...)
-        return nil, [32]byte{}, nil, err
+        })
+        return nil, [32]byte{}, nil, jsonError
     }
-
 
     var extractedDg15 []byte
     if documentSOD.DG15 != nil {
         extractedDg15, err = hex.DecodeString(*documentSOD.DG15)
         if err != nil {
             log.WithError(err).Error("failed to decode dg15Hash")
-            *jsonError = append(*jsonError, problems.BadRequest(validation.Errors{
+            jsonError = problems.BadRequest(validation.Errors{
                 "dg15": errors.New("failed to decode dg15Hash"),
-            })...)
-            return nil, [32]byte{}, nil, err
+            })
+            return nil, [32]byte{}, nil, jsonError
         }
-
 
         extractedDg15Hash := types.GeneralHash(algorithmPair.DgHashAlgorithm)
         extractedDg15Hash.Write(extractedDg15)
 
-
         if !bytes.Equal(dg15Hash, extractedDg15Hash.Sum(nil)) {
             log.Error("dg15Hash does not match")
-            *jsonError = problems.BadRequest(validation.Errors{
+            jsonError = problems.BadRequest(validation.Errors{
                 "DG15": errors.New("dg15Hash does not match"),
             })
-            return nil, [32]byte{}, nil, errors.New("dg15Hash does not match")
+            return nil, [32]byte{}, nil, jsonError
         }
     }
-
 
     _, passportPubkeyHash, err := utils.ExtractPublicKey(extractedDg15)
     if err != nil {
         log.WithError(err).Error("failed to extract public key")
-        *jsonError = append(*jsonError, problems.InternalError())
-        return nil, [32]byte{}, nil, err
+        jsonError = append(jsonError, problems.InternalError())
+        return nil, [32]byte{}, nil, jsonError
     }
-
 
     return dg1Hash, passportPubkeyHash, passportHashBytes, nil
 }

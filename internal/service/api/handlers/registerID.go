@@ -156,15 +156,15 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
         })...)
 		return 
 	}
-	dg1Hash, passportPubkeyHash, passportHashBytes, err := validateAllExceptProof(
+	dg1Hash, passportPubkeyHash, passportHashBytes, validateErr := validateAllExceptProof(
 		addressesCfg,
 		&documentSOD,
-		&jsonError,
 		log,
 		algorithmPair,
 		verifierCfg,
 	)
-	if err != nil {
+	if validateErr != nil {
+		jsonError = validateErr
 		return
 	}
 
