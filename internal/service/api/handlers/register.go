@@ -11,7 +11,6 @@ import (
 	"math/big"
 	"net/http"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -109,23 +108,9 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	var dg1Hash []byte
 	verifierCfg := api.VerifierConfig(r)
 	addressesCfg := api.AddressesConfig(r)
 
-	verifierContract, passportPubkeyHash, passportHashBytes, err:= 
-	validateAllExceptProof(
-		addressesCfg,
-		&documentSOD,
-		&jsonError,
-		&dg1Hash,
-		log,
-		algorithmPair,
-		verifierCfg,
-	)
-	if err != nil {
-		return
-	}
 
 	// Verify zk proof
     if err := verifier.VerifyGroth16(
@@ -157,12 +142,32 @@ func Register(w http.ResponseWriter, r *http.Request) {
     proofDg1CommitmentBytes := proofDg1Commitment.FillBytes(make([]byte, 32))
 
 
+
+	dg1Hash, passportPubkeyHash, passportHashBytes, err := validateAllExceptProof(
+		addressesCfg,
+		&documentSOD,
+		&jsonError,
+		log,
+		algorithmPair,
+		verifierCfg,
+	)
+	if err != nil {
+		return
+	}
+
     dg1Truncated := utils.TruncateDg1Hash(dg1Hash)
     if !bytes.Equal(dg1Truncated[:], proofDg1Decimal.FillBytes(make([]byte, 32))) {
         log.Error("proof contains foreign data group 1")
         jsonError = problems.BadRequest(validation.Errors{
             "zk_proof": errors.New("proof contains foreign data group 1"),
         })
+        return
+    }
+
+	verifierContract, ok := addressesCfg.Verifiers[algorithmPair.DgHashAlgorithm]
+    if !ok {
+        log.Errorf("No verifier contract found for hash algorithm %s", algorithmPair.DgHashAlgorithm)
+        jsonError = append(jsonError, problems.InternalError())
         return
     }
 
@@ -426,16 +431,14 @@ func validateCert(cert *x509.Certificate, masterCerts *x509.CertPool, disableTim
 	return nil
 }
 
-
 func validateAllExceptProof(
     addressesCfg config.AddressesConfig,
     documentSOD *data.DocumentSOD,
     jsonError *[]*jsonapi.ErrorObject,
-	dg1Hash *[]byte,
     log *logan.Entry,
     algorithmPair types.AlgorithmPair,
-	verifierCfg *config.VerifierConfig,
-) (*common.Address, [32]byte, []byte, error) {
+    verifierCfg *config.VerifierConfig,
+) ([]byte, [32]byte, []byte, error) {
     signedAttributes, err := hex.DecodeString(documentSOD.SignedAttributes)
     if err != nil {
         log.WithError(err).Error("failed to decode signed attributes")
@@ -444,6 +447,7 @@ func validateAllExceptProof(
         })
         return nil, [32]byte{}, nil, err
     }
+
 
     encapsulatedContent, err := hex.DecodeString(documentSOD.EncapsulatedContent)
     if err != nil {
@@ -454,6 +458,7 @@ func validateAllExceptProof(
         return nil, [32]byte{}, nil, err
     }
 
+
     cert, err := parseCertificate([]byte(documentSOD.PemFile))
     if err != nil {
         log.WithError(err).Error("failed to parse certificate")
@@ -462,6 +467,7 @@ func validateAllExceptProof(
         })
         return nil, [32]byte{}, nil, err
     }
+
 
     slaveSignature, err := hex.DecodeString(documentSOD.Signature)
     if err != nil {
@@ -472,7 +478,8 @@ func validateAllExceptProof(
         return nil, [32]byte{}, nil, err
     }
 
-    dg1Hashed, err := utils.GetDataGroup(encapsulatedContent, 1)
+
+    dg1Hash, err := utils.GetDataGroup(encapsulatedContent, 1)
     if err != nil {
         log.WithError(err).Error("failed to get data group 1")
         *jsonError = append(*jsonError, problems.BadRequest(validation.Errors{
@@ -480,7 +487,7 @@ func validateAllExceptProof(
         })...)
         return nil, [32]byte{}, nil, err
     }
-	*dg1Hash = dg1Hashed
+
 
     if dg1Hash == nil {
         log.Error("data group 1 is missing")
@@ -489,6 +496,7 @@ func validateAllExceptProof(
         })
         return nil, [32]byte{}, nil, errors.New("data group 1 is missing")
     }
+
 
     saHashBytes, err := verifySod(signedAttributes, encapsulatedContent, slaveSignature, cert, &algorithmPair, verifierCfg)
     if err != nil {
@@ -499,15 +507,19 @@ func validateAllExceptProof(
             return nil, [32]byte{}, nil, err
         }
 
+
         log.WithError(sodError.VerboseError).Error("failed to verify SOD")
+
 
         documentSOD.ErrorKind = sodError.KindPtr()
         documentSOD.Error = sodError.VerboseErrorPtr()
+
 
         if sodError.Details == nil {
             *jsonError = append(*jsonError, problems.InternalError())
             return nil, [32]byte{}, nil, err
         }
+
 
         *jsonError = problems.BadRequest(validation.Errors{
             sodError.Details.Kind.Field(): sodError.Details.Description,
@@ -515,12 +527,14 @@ func validateAllExceptProof(
         return nil, [32]byte{}, nil, err
     }
 
+
     truncatedSignedAttributes, err := utils.ExtractFirstNBits(saHashBytes, 252)
     if err != nil {
         log.WithError(err).Error("failed to extract bits from signed attributes")
         *jsonError = append(*jsonError, problems.InternalError())
         return nil, [32]byte{}, nil, err
     }
+
 
     toBeHashed := []*big.Int{big.NewInt(0).SetBytes(utils.ReverseBits(truncatedSignedAttributes))}
     passportHash, err := poseidon.Hash(toBeHashed)
@@ -530,7 +544,9 @@ func validateAllExceptProof(
         return nil, [32]byte{}, nil, err
     }
 
+
     passportHashBytes := passportHash.FillBytes(make([]byte, 32))
+
 
     dg15Hash, err := utils.GetDataGroup(encapsulatedContent, 15)
     if err != nil {
@@ -540,6 +556,7 @@ func validateAllExceptProof(
         })...)
         return nil, [32]byte{}, nil, err
     }
+
 
     var extractedDg15 []byte
     if documentSOD.DG15 != nil {
@@ -552,8 +569,10 @@ func validateAllExceptProof(
             return nil, [32]byte{}, nil, err
         }
 
+
         extractedDg15Hash := types.GeneralHash(algorithmPair.DgHashAlgorithm)
         extractedDg15Hash.Write(extractedDg15)
+
 
         if !bytes.Equal(dg15Hash, extractedDg15Hash.Sum(nil)) {
             log.Error("dg15Hash does not match")
@@ -564,6 +583,7 @@ func validateAllExceptProof(
         }
     }
 
+
     _, passportPubkeyHash, err := utils.ExtractPublicKey(extractedDg15)
     if err != nil {
         log.WithError(err).Error("failed to extract public key")
@@ -571,12 +591,6 @@ func validateAllExceptProof(
         return nil, [32]byte{}, nil, err
     }
 
-    verifierContract, ok := addressesCfg.Verifiers[algorithmPair.DgHashAlgorithm]
-    if !ok {
-        log.Errorf("No verifier contract found for hash algorithm %s", algorithmPair.DgHashAlgorithm)
-        *jsonError = append(*jsonError, problems.InternalError())
-        return nil, [32]byte{}, nil, errors.New("no verifier contract found")
-    }
 
-    return verifierContract, passportPubkeyHash, passportHashBytes, nil
+    return dg1Hash, passportPubkeyHash, passportHashBytes, nil
 }

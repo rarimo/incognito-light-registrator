@@ -17,13 +17,19 @@ addresses:
     sha256: 91E3d9ef73afC08E083719e8CF052c1d810aF191
     sha384: Abf2Fef1aF4ca7cB7EB3F4F2169D55C502E086aD
     sha512: b7609357EAEA80C8a064Aa7B9Ff1D7E7b76fDB98
+  verifiers_id:
+    sha1: 0000000000000000000000000000010bedeb1oed
+    sha224: 1000000000000000000000000000010bedeb1oed
+    sha256: 2000000000000000000000000000010bedeb1oed
+    sha384: 3000000000000000000000000000010bedeb1oed
+    sha512: 4000000000000000000000000000010bedeb1oed
 
 log:
   level: debug
   disable_sentry: true
 
 db:
-  url: postgres://ilr:ilr@postgres-db:5432/ilr?sslmode=disable
+  url: postgres://ilr:ilr@localhost:5432/ilr?sslmode=disable
 
 listener:
   addr: :8000

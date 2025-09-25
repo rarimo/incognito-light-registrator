@@ -116,87 +116,8 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	var dg1Hash []byte
 	verifierCfg := api.VerifierConfig(r)
 	addressesCfg := api.AddressesConfig(r)
-
-	verifierContract, passportPubkeyHash, passportHashBytes, err:= 
-	validateAllExceptProof(
-		addressesCfg,
-		&documentSOD,
-		&jsonError,
-		&dg1Hash,
-		log,
-		algorithmPair,
-		verifierCfg,
-	)
-	if err != nil {
-		return
-	}
-
-	hexProof, err := base64.StdEncoding.DecodeString(req.Data.Attributes.ZkProof)
-    if err != nil {
-        log.WithError(err).Error("failed to decode base64")
-		jsonError = problems.BadRequest(validation.Errors{
-			"zk_proof": err,
-		})
-		return
-    }
-
-    pubSignal1 := hexProof[0:32]
-    pubSignal2 := hexProof[32:64]
-
-    hex1 := hex.EncodeToString(pubSignal1)
-    hex2 := hex.EncodeToString(pubSignal2)
-
-	proofDg1Decimal, ok := big.NewInt(0).SetString(hex2, 16)
-	if !ok {
-		log.Error("failed to convert proofDg1Decimal hex string to big.Int")
-		jsonError = append(jsonError, problems.InternalError())
-		return
-	}
-
-	proofDg1Commitment, ok := big.NewInt(0).SetString(hex1, 16)
-	if !ok {
-		log.Error("failed to convert proofDg1Commitment hex string to big.Int")
-		jsonError = append(jsonError, problems.InternalError())
-		return
-	}
-
-	proofDg1CommitmentBytes := proofDg1Commitment.FillBytes(make([]byte, 32))
-
-	dg1Truncated := utils.TruncateDg1Hash(dg1Hash)
-
-	if !bytes.Equal(dg1Truncated[:], proofDg1Decimal.FillBytes(make([]byte, 32))) {
-		log.Error("proof contains foreign data group 1")
-		jsonError = problems.BadRequest(validation.Errors{
-			"zk_proof": errors.New("proof contains foreign data group 1"),
-		})
-		return
-	}
-
-	rawSignedData, err := utils.BuildSignedData(
-		addressesCfg.RegistrationContract,
-		verifierContract,
-		[32]byte(passportHashBytes),
-		[32]byte(proofDg1CommitmentBytes),
-		passportPubkeyHash,
-	)
-	if err != nil {
-		log.WithError(err).Error("failed to build signed data")
-		jsonError = append(jsonError, problems.InternalError())
-		return
-	}
-
-
-	signedData := bytes.TrimLeft(rawSignedData, "\x00")
-
-	signature, err := crypto.Sign(utils.ToEthSignedMessageHash(crypto.Keccak256(signedData)), api.KeysConfig(r).SignatureKey)
-	if err != nil {
-		log.WithError(err).Error("failed to sign messageHash")
-		jsonError = append(jsonError, problems.InternalError())
-		return
-	}
 	alg := types.HashAlgorithmFromString(req.Data.Attributes.DocumentSod.HashAlgorithm).BitSize()
 
 	decoded, decodingErr := base64.StdEncoding.DecodeString(req.Data.Attributes.ZkProof)
@@ -235,6 +156,87 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
         })...)
 		return 
 	}
+	dg1Hash, passportPubkeyHash, passportHashBytes, err := validateAllExceptProof(
+		addressesCfg,
+		&documentSOD,
+		&jsonError,
+		log,
+		algorithmPair,
+		verifierCfg,
+	)
+	if err != nil {
+		return
+	}
+
+	hexProof, err := base64.StdEncoding.DecodeString(req.Data.Attributes.ZkProof)
+    if err != nil {
+        log.WithError(err).Error("failed to decode base64")
+		jsonError = problems.BadRequest(validation.Errors{
+			"zk_proof": err,
+		})
+		return
+    }
+
+
+
+	proofDg1Decimal, ok := big.NewInt(0).SetString(hex.EncodeToString(hexProof[32:64]), 16)
+	if !ok {
+		log.Error("failed to convert proofDg1Decimal hex string to big.Int")
+		jsonError = append(jsonError, problems.InternalError())
+		return
+	}
+
+	proofDg1Commitment, ok := big.NewInt(0).SetString(hex.EncodeToString(hexProof[0:32]), 16)
+	if !ok {
+		log.Error("failed to convert proofDg1Commitment hex string to big.Int")
+		jsonError = append(jsonError, problems.InternalError())
+		return
+	}
+
+	proofDg1CommitmentBytes := proofDg1Commitment.FillBytes(make([]byte, 32))
+
+	dg1Truncated := utils.TruncateDg1Hash(dg1Hash)
+
+	if !bytes.Equal(dg1Truncated[:], proofDg1Decimal.FillBytes(make([]byte, 32))) {
+		log.Error("proof contains foreign data group 1")
+		jsonError = problems.BadRequest(validation.Errors{
+			"zk_proof": errors.New("proof contains foreign data group 1"),
+		})
+		return
+	}
+
+	verifierContract, ok := addressesCfg.VerifiersID[algorithmPair.DgHashAlgorithm]
+    if !ok {
+        log.Errorf("No verifier contract found for hash algorithm %s", algorithmPair.DgHashAlgorithm)
+        jsonError = append(jsonError, problems.InternalError())
+        return
+    }
+
+
+	rawSignedData, err := utils.BuildSignedData(
+		addressesCfg.RegistrationContract,
+		verifierContract,
+		[32]byte(passportHashBytes),
+		[32]byte(proofDg1CommitmentBytes),
+		passportPubkeyHash,
+	)
+	if err != nil {
+		log.WithError(err).Error("failed to build signed data")
+		jsonError = append(jsonError, problems.InternalError())
+		return
+	}
+
+
+	signedData := bytes.TrimLeft(rawSignedData, "\x00")
+
+	signature, err := crypto.Sign(utils.ToEthSignedMessageHash(crypto.Keccak256(signedData)), api.KeysConfig(r).SignatureKey)
+	if err != nil {
+		log.WithError(err).Error("failed to sign messageHash")
+		jsonError = append(jsonError, problems.InternalError())
+		return
+	}
+
+	
 
 	signature[64] += 27
 

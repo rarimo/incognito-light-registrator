@@ -27,6 +27,7 @@ type Addresses struct {
 type AddressesConfig struct {
 	RegistrationContract *common.Address
 	Verifiers            map[types.HashAlgorithm]*common.Address
+	VerifiersID            map[types.HashAlgorithm]*common.Address
 }
 
 func (e *Addresses) AddressesConfig() AddressesConfig {
@@ -34,6 +35,7 @@ func (e *Addresses) AddressesConfig() AddressesConfig {
 		newCfg := struct {
 			RegistrationContract *common.Address   `fig:"registration_contract,required"`
 			Verifiers            map[string]string `fig:"verifiers,required"`
+			VerifiersID          map[string]string `fig:"verifiers,required"`
 		}{}
 
 		err := figure.
@@ -51,9 +53,16 @@ func (e *Addresses) AddressesConfig() AddressesConfig {
 			addresses[types.HashAlgorithmFromString(algo)] = &address
 		}
 
+		addressesID := make(map[types.HashAlgorithm]*common.Address)
+		for algo, address := range newCfg.VerifiersID {
+			address := common.HexToAddress(address)
+			addressesID[types.HashAlgorithmFromString(algo)] = &address
+		}
+
 		return AddressesConfig{
 			RegistrationContract: newCfg.RegistrationContract,
 			Verifiers:            addresses,
+			VerifiersID:          addressesID,
 		}
 	}).(AddressesConfig)
 }
