@@ -26,7 +26,7 @@ RUN echo $PATH
 
 FROM frolvlad/alpine-glibc:latest
 
-RUN apk add --no-cache libc++ libgcc
+RUN apk add --no-cache libc++ libgcc curl
 
 COPY --from=buildbase /usr/local/bin/incognito-light-registrator /usr/local/bin/incognito-light-registrator
 COPY --from=buildbase /usr/local/bin/bb /usr/local/bin/bb
@@ -39,4 +39,4 @@ RUN echo "$(ls -alF /usr/local/bin/)"
 RUN echo "$(bb --version)"
 
 
-ENTRYPOINT ["/bin/sh", "-c", "which bb && bb -v && exec incognito-light-registrator"]
+ENTRYPOINT ["incognito-light-registrator"]

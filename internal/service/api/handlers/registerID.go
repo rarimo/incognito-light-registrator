@@ -229,7 +229,7 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !verified {
-		log.WithError(err).Error("invalid proof")
+		log.WithError(err).Error(string(content))
         jsonError = append(jsonError, problems.BadRequest(validation.Errors{
             "zk_proof": errors.New("invalid proof"),
         })...)

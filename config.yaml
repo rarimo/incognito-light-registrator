@@ -23,7 +23,7 @@ log:
   disable_sentry: true
 
 db:
-  url: postgres://ilr:ilr@localhost:5432/ilr?sslmode=disable
+  url: postgres://ilr:ilr@postgres-db:5432/ilr?sslmode=disable
 
 listener:
   addr: :8000
@@ -35,6 +35,7 @@ cop:
   service_name: identity-provider-service
   service_port: 80
 
+# Randomly generated key for testing purpose.
 keys:
   signature_key: "01077020101042022d0c137d5c1443b945b305963951c0dd20a03a710bf387f0"
 
