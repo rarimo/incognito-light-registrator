@@ -27,7 +27,7 @@ type Addresses struct {
 type AddressesConfig struct {
 	RegistrationContract *common.Address
 	Verifiers            map[types.HashAlgorithm]*common.Address
-	VerifiersID            map[types.HashAlgorithm]*common.Address
+	VerifiersID          map[types.HashAlgorithm]*common.Address
 }
 
 func (e *Addresses) AddressesConfig() AddressesConfig {
@@ -35,7 +35,7 @@ func (e *Addresses) AddressesConfig() AddressesConfig {
 		newCfg := struct {
 			RegistrationContract *common.Address   `fig:"registration_contract,required"`
 			Verifiers            map[string]string `fig:"verifiers,required"`
-			VerifiersID          map[string]string `fig:"verifiers,required"`
+			VerifiersID          map[string]string `fig:"verifiers_id,required"`
 		}{}
 
 		err := figure.

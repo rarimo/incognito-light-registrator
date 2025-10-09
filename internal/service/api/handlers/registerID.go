@@ -120,42 +120,6 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 	addressesCfg := api.AddressesConfig(r)
 	alg := types.HashAlgorithmFromString(req.Data.Attributes.DocumentSod.HashAlgorithm).BitSize()
 
-	decoded, decodingErr := base64.StdEncoding.DecodeString(req.Data.Attributes.ZkProof)
-	if decodingErr != nil {
-		log.WithError(err).Error("failed to decode base64")
-        jsonError = append(jsonError, problems.BadRequest(validation.Errors{
-            "zk_proof": errors.New("proof decoding failed"),
-        })...)
-		return
-	}
-	writingError := os.WriteFile(fmt.Sprintf("proof%s", requestID), decoded, 0644)
-	if writingError != nil {
-		log.WithError(err).Error("failed to write decoded base64")
-        jsonError = append(jsonError, problems.InternalError())
-		return
-	}
-
-	command := fmt.Sprintf("bb verify -s ultra_honk -k ./verification_keys/registerIdentityLight%d.vk -p ./proof%s -v &> cmd%s.txt", alg, requestID, requestID)
-	RunCommand(command)
-
-	content, err := os.ReadFile(fmt.Sprintf("cmd%s.txt", requestID))
-    if err != nil {
-		log.WithError(err).Error("failed to write decoded base64")
-        jsonError = append(jsonError, problems.InternalError())
-        return
-    }
-	verified := false
-	if parts := strings.Split(string(content), "verified: "); len(parts) > 1 {
-		verified = strings.TrimSpace(parts[1]) == "1"
-	}
-
-	if !verified {
-		log.WithError(err).Error(string(content))
-        jsonError = append(jsonError, problems.BadRequest(validation.Errors{
-            "zk_proof": errors.New("invalid proof"),
-        })...)
-		return 
-	}
 	dg1Hash, passportPubkeyHash, passportHashBytes, validateErr := validateAllExceptProof(
 		addressesCfg,
 		&documentSOD,
@@ -168,16 +132,51 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	decoded, decodingErr := base64.StdEncoding.DecodeString(req.Data.Attributes.ZkProof)
+	if decodingErr != nil {
+		log.WithError(err).Error("failed to decode base64")
+		jsonError = append(jsonError, problems.BadRequest(validation.Errors{
+			"zk_proof": errors.New("proof decoding failed"),
+		})...)
+		return
+	}
+	writingError := os.WriteFile(fmt.Sprintf("proof%s", requestID), decoded, 0644)
+	if writingError != nil {
+		log.WithError(err).Error("failed to write decoded base64")
+		jsonError = append(jsonError, problems.InternalError())
+		return
+	}
+
+	command := fmt.Sprintf("bb verify -s ultra_honk -k ./verification_keys/registerIdentityLight%d.vk -p ./proof%s -v &> cmd%s.txt", alg, requestID, requestID)
+	RunCommand(command)
+
+	content, err := os.ReadFile(fmt.Sprintf("cmd%s.txt", requestID))
+	if err != nil {
+		log.WithError(err).Error("failed to write decoded base64")
+		jsonError = append(jsonError, problems.InternalError())
+		return
+	}
+	verified := false
+	if parts := strings.Split(string(content), "verified: "); len(parts) > 1 {
+		verified = strings.TrimSpace(parts[1]) == "1"
+	}
+
+	if !verified {
+		log.WithError(err).Error(string(content))
+		jsonError = append(jsonError, problems.BadRequest(validation.Errors{
+			"zk_proof": errors.New("invalid proof"),
+		})...)
+		return
+	}
+
 	hexProof, err := base64.StdEncoding.DecodeString(req.Data.Attributes.ZkProof)
-    if err != nil {
-        log.WithError(err).Error("failed to decode base64")
+	if err != nil {
+		log.WithError(err).Error("failed to decode base64")
 		jsonError = problems.BadRequest(validation.Errors{
 			"zk_proof": err,
 		})
 		return
-    }
-
-
+	}
 
 	proofDg1Decimal, ok := big.NewInt(0).SetString(hex.EncodeToString(hexProof[32:64]), 16)
 	if !ok {
@@ -206,12 +205,11 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	verifierContract, ok := addressesCfg.VerifiersID[algorithmPair.DgHashAlgorithm]
-    if !ok {
-        log.Errorf("No verifier contract found for hash algorithm %s", algorithmPair.DgHashAlgorithm)
-        jsonError = append(jsonError, problems.InternalError())
-        return
-    }
-
+	if !ok {
+		log.Errorf("No verifier contract found for hash algorithm %s", algorithmPair.DgHashAlgorithm)
+		jsonError = append(jsonError, problems.InternalError())
+		return
+	}
 
 	rawSignedData, err := utils.BuildSignedData(
 		addressesCfg.RegistrationContract,
@@ -226,7 +224,6 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
 	signedData := bytes.TrimLeft(rawSignedData, "\x00")
 
 	signature, err := crypto.Sign(utils.ToEthSignedMessageHash(crypto.Keccak256(signedData)), api.KeysConfig(r).SignatureKey)
@@ -235,8 +232,6 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 		jsonError = append(jsonError, problems.InternalError())
 		return
 	}
-
-	
 
 	signature[64] += 27
 
@@ -253,7 +248,6 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
-
 
 func RunCommand(command string) (string, string, error) {
 	var cmd *exec.Cmd
