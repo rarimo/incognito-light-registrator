@@ -197,7 +197,11 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 	dg1Truncated := utils.TruncateDg1Hash(dg1Hash)
 
 	if !bytes.Equal(dg1Truncated[:], proofDg1Decimal.FillBytes(make([]byte, 32))) {
-		log.Error("proof contains foreign data group 1")
+		log.Error(fmt.Sprintf(
+			"proof contains foreign data group 1 - hashed dg1: %s, extracted hash: %s",
+			hex.EncodeToString(dg1Truncated[:]),
+			hex.EncodeToString(proofDg1Decimal.FillBytes(make([]byte, 32))),
+		))
 		jsonError = problems.BadRequest(validation.Errors{
 			"zk_proof": errors.New("proof contains foreign data group 1"),
 		})
