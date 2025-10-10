@@ -14,21 +14,25 @@ post:
             data:
               $ref: "#/components/schemas/RegisterID"
   responses:
-    "200":
+    '200':
       description: Success
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/RegisterIDResponse"
-    "400":
+            type: object
+            properties:
+              data:
+                type: object
+                $ref: '#/components/schemas/Signature'
+    '400':
       description: Bad Request Error
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/Errors"
-    "500":
+            $ref: '#/components/schemas/Errors'
+    '500':
       description: Internal Error
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/Errors"
+            $ref: '#/components/schemas/Errors'
