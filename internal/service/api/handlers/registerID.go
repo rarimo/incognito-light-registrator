@@ -27,6 +27,7 @@ import (
 	"github.com/rarimo/passport-identity-provider/resources"
 	"gitlab.com/distributed_lab/ape"
 	"gitlab.com/distributed_lab/ape/problems"
+	"gitlab.com/distributed_lab/logan/v3"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
@@ -197,11 +198,10 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 	dg1Truncated := utils.TruncateDg1Hash(dg1Hash)
 
 	if !bytes.Equal(dg1Truncated[:], proofDg1Decimal.FillBytes(make([]byte, 32))) {
-		log.Error(fmt.Sprintf(
-			"proof contains foreign data group 1 - hashed dg1: %s, extracted hash: %s",
-			hex.EncodeToString(dg1Truncated[:]),
-			hex.EncodeToString(proofDg1Decimal.FillBytes(make([]byte, 32))),
-		))
+		log.WithFields(logan.F{
+			"dg1Truncated":    hex.EncodeToString(dg1Truncated[:]),
+			"proofDg1Decimal": hex.EncodeToString(proofDg1Decimal.FillBytes(make([]byte, 32))),
+		}).Error("proof contains foreign data group 1")
 		jsonError = problems.BadRequest(validation.Errors{
 			"zk_proof": errors.New("proof contains foreign data group 1"),
 		})
