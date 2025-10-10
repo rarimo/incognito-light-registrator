@@ -71,7 +71,7 @@ Payload example (proof is provided as an example and actually does not prove any
   ```
   git clone github.com/rarimo/incognito-light-registrator
   cd incognito-light-registrator
-  go build main.go
+  go run main.go  migrate up && go run service
   export KV_VIPER_FILE=./config.yaml
   ./main migrate up
   ./main run service

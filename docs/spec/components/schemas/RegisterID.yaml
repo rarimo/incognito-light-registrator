@@ -1,0 +1,17 @@
+allOf:
+  - $ref: '#/components/schemas/RegisterKey'
+  - type: object
+    required:
+      - attributes
+    properties:
+      attributes:
+        type: object
+        required:
+          - zk_proof
+          - document_sod
+        properties:
+          zk_proof:
+            type: string
+            description: Zero-knowledge proof in base64 format.
+          document_sod:
+            $ref: '#/components/schemas/DocumentSod'

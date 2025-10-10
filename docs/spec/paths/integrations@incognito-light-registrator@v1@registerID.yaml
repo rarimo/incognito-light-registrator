@@ -1,0 +1,34 @@
+post:
+  tags:
+    - Register
+  summary: RegisterID
+  operationId: registerID
+  requestBody:
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+            - data
+          properties:
+            data:
+              $ref: "#/components/schemas/RegisterID"
+  responses:
+    "200":
+      description: Success
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/RegisterIDResponse"
+    "400":
+      description: Bad Request Error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Errors"
+    "500":
+      description: Internal Error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Errors"

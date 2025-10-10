@@ -17,6 +17,12 @@ addresses:
     sha256: 91E3d9ef73afC08E083719e8CF052c1d810aF191
     sha384: Abf2Fef1aF4ca7cB7EB3F4F2169D55C502E086aD
     sha512: b7609357EAEA80C8a064Aa7B9Ff1D7E7b76fDB98
+  verifiers_id:
+    sha1: 0000000000000000000000000000010bedeb1oed
+    sha224: 1000000000000000000000000000010bedeb1oed
+    sha256: 2000000000000000000000000000010bedeb1oed
+    sha384: 3000000000000000000000000000010bedeb1oed
+    sha512: 4000000000000000000000000000010bedeb1oed
 
 log:
   level: debug
@@ -34,3 +40,8 @@ cop:
   upstream: "http://..."
   service_name: identity-provider-service
   service_port: 80
+
+# Randomly generated key for testing purpose.
+keys:
+  signature_key: "01077020101042022d0c137d5c1443b945b305963951c0dd20a03a710bf387f0"
+

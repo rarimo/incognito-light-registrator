@@ -45,6 +45,24 @@ func (h HashAlgorithm) String() string {
 	}
 }
 
+func (h HashAlgorithm) BitSize() int {
+    switch h {
+    case SHA1:
+        return 160
+    case SHA224:
+        return 224
+    case SHA256:
+        return 256
+    case SHA384:
+        return 384
+    case SHA512:
+        return 512
+    default:
+        return 0
+    }
+}
+
+
 func HashAlgorithmFromString(alg string) HashAlgorithm {
 	h, ok := HashAlgorithmMap[strings.ToUpper(alg)]
 	if !ok {
