@@ -31,5 +31,4 @@ COPY --from=buildbase /go/src/github.com/rarimo/incognito-light-registrator/mast
 
 ENV PATH="/usr/local/bin:${PATH}"
 
-
 ENTRYPOINT ["incognito-light-registrator"]

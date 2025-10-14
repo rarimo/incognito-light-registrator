@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 
 	"github.com/rarimo/certificate-transparency-go/x509"
 	"github.com/rarimo/passport-identity-provider/internal/types"
@@ -19,6 +20,7 @@ type VerifierConfig struct {
 	MasterCerts       *x509.CertPool
 	DisableTimeChecks bool
 	DisableNameChecks bool
+	TmpFilePath       string
 }
 
 type verifier struct {
@@ -39,6 +41,7 @@ func (v *verifier) VerifierConfig() *VerifierConfig {
 			MasterCertsPath       string            `fig:"master_certs_path,required"`
 			DisableTimeChecks     bool              `fig:"disable_time_checks"`
 			DisableNameChecks     bool              `fig:"disable_name_checks"`
+			TmpFilePath           string            `fig:"tmpfilepath"`
 		}{}
 
 		err := figure.
@@ -68,11 +71,17 @@ func (v *verifier) VerifierConfig() *VerifierConfig {
 		roots := x509.NewCertPool()
 		roots.AppendCertsFromPEM(masterCerts)
 
+		tmpPath := newCfg.TmpFilePath
+		if !strings.HasSuffix(tmpPath, "/") {
+			tmpPath = tmpPath + "/"
+		}
+
 		return &VerifierConfig{
 			VerificationKeys:  verificationKeys,
 			MasterCerts:       roots,
 			DisableTimeChecks: newCfg.DisableTimeChecks,
 			DisableNameChecks: newCfg.DisableNameChecks,
+			TmpFilePath:       tmpPath,
 		}
 	}).(*VerifierConfig)
 }

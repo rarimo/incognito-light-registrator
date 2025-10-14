@@ -60,9 +60,10 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 		RawSOD:              utils.TruncateHexPrefix(req.Data.Attributes.DocumentSod.Sod),
 		PemFile:             req.Data.Attributes.DocumentSod.PemFile,
 	}
-
-	proofFile := fmt.Sprintf("proof%s", requestID)
-	cmdFile := fmt.Sprintf("cmd%s.txt", requestID)
+	verifierCfg := api.VerifierConfig(r)
+	folderPath := verifierCfg.TmpFilePath
+	proofFile := fmt.Sprintf("%sproof%s", folderPath, requestID)
+	cmdFile := fmt.Sprintf("%scmd%s.txt", folderPath, requestID)
 
 	var response *resources.SignatureResponse
 	var jsonError []*jsonapi.ErrorObject
@@ -117,7 +118,6 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	verifierCfg := api.VerifierConfig(r)
 	addressesCfg := api.AddressesConfig(r)
 	alg := types.HashAlgorithmFromString(req.Data.Attributes.DocumentSod.HashAlgorithm).BitSize()
 
@@ -141,17 +141,17 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 		})...)
 		return
 	}
-	writingError := os.WriteFile(fmt.Sprintf("proof%s", requestID), decoded, 0644)
+	writingError := os.WriteFile(proofFile, decoded, 0644)
 	if writingError != nil {
-		log.WithError(err).Error("failed to write decoded base64")
+		log.WithError(writingError).Error("failed to write decoded base64")
 		jsonError = append(jsonError, problems.InternalError())
 		return
 	}
 
-	command := fmt.Sprintf("bb verify -s ultra_honk -k ./verification_keys/registerIdentityLight%d.vk -p ./proof%s -v &> cmd%s.txt", alg, requestID, requestID)
+	command := fmt.Sprintf("bb verify -s ultra_honk -k ./verification_keys/registerIdentityLight%d.vk -p %s -v &> %s", alg, proofFile, cmdFile)
 	RunCommand(command)
 
-	content, err := os.ReadFile(fmt.Sprintf("cmd%s.txt", requestID))
+	content, err := os.ReadFile(cmdFile)
 	if err != nil {
 		log.WithError(err).Error("failed to write decoded base64")
 		jsonError = append(jsonError, problems.InternalError())
