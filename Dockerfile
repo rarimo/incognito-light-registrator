@@ -30,6 +30,5 @@ COPY --from=buildbase /go/src/github.com/rarimo/incognito-light-registrator/veri
 COPY --from=buildbase /go/src/github.com/rarimo/incognito-light-registrator/masterList.dev.pem /masterList.dev.pem
 
 ENV PATH="/usr/local/bin:${PATH}"
-RUN mkdir tmp
 
 ENTRYPOINT ["incognito-light-registrator"]
