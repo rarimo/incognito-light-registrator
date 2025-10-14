@@ -62,8 +62,8 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 	}
 	verifierCfg := api.VerifierConfig(r)
 	folderPath := verifierCfg.TmpFilePath
-	proofFile := fmt.Sprintf("proof%s", requestID)
-	cmdFile := fmt.Sprintf("cmd%s.txt", requestID)
+	proofFile := fmt.Sprintf("%sproof%s", folderPath, requestID)
+	cmdFile := fmt.Sprintf("%scmd%s.txt", folderPath, requestID)
 
 	var response *resources.SignatureResponse
 	var jsonError []*jsonapi.ErrorObject
@@ -105,10 +105,10 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 			ape.Render(w, response)
 		}
 
-		if err := os.Remove(folderPath + proofFile); err != nil && !os.IsNotExist(err) {
+		if err := os.Remove(proofFile); err != nil && !os.IsNotExist(err) {
 			log.WithError(err).Errorf("failed to remove file %s", proofFile)
 		}
-		if err := os.Remove(folderPath + cmdFile); err != nil && !os.IsNotExist(err) {
+		if err := os.Remove(cmdFile); err != nil && !os.IsNotExist(err) {
 			log.WithError(err).Errorf("failed to remove file %s", cmdFile)
 		}
 
@@ -141,17 +141,17 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 		})...)
 		return
 	}
-	writingError := os.WriteFile(fmt.Sprintf("%sproof%s", folderPath, requestID), decoded, 0644)
+	writingError := os.WriteFile(proofFile, decoded, 0644)
 	if writingError != nil {
 		log.WithError(writingError).Error("failed to write decoded base64")
 		jsonError = append(jsonError, problems.InternalError())
 		return
 	}
 
-	command := fmt.Sprintf("bb verify -s ultra_honk -k ./verification_keys/registerIdentityLight%d.vk -p ./%sproof%s -v &> %scmd%s.txt", alg, folderPath, requestID, folderPath, requestID)
+	command := fmt.Sprintf("bb verify -s ultra_honk -k ./verification_keys/registerIdentityLight%d.vk -p %s -v &> %s", alg, proofFile, cmdFile)
 	RunCommand(command)
 
-	content, err := os.ReadFile(fmt.Sprintf("%scmd%s.txt", folderPath, requestID))
+	content, err := os.ReadFile(cmdFile)
 	if err != nil {
 		log.WithError(err).Error("failed to write decoded base64")
 		jsonError = append(jsonError, problems.InternalError())
