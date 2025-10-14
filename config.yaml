@@ -8,6 +8,7 @@ verifier:
   master_certs_path: "./masterList.dev.pem"
   disableTimeChecks: false
   disableNameChecks: false
+  tmpFilePath: "tmp/"
 
 addresses:
   registration_contract: a2e2Cbbd0BAa74FE1bb4b61B12D420072806FFe0
@@ -18,11 +19,11 @@ addresses:
     sha384: Abf2Fef1aF4ca7cB7EB3F4F2169D55C502E086aD
     sha512: b7609357EAEA80C8a064Aa7B9Ff1D7E7b76fDB98
   verifiers_id:
-    sha1: d641a8a01a2E2AFc51cc8Ce3d040D32e2c0f10aa
-    sha224: 9eAf3fe44822F03E7301dB664C2abA2DC3791aCD
-    sha256: 492d5b524326E5810489B80Ca14a7791BaCe39bA
-    sha384: 38A4F255E16D96B7cC4Abc5cA478FD0BC2cEb0fC
-    sha512: DFb0e4487525c98E99bF7e8f37769Ce59FAe20c9
+    sha1: 051D97006f2c3659F65de44D8bf77Ee2D5Ff4e5e
+    sha224: A67AA14bD2A6502df5813C0E87d87ddE1c1739EF
+    sha256: FF165C4eF90612D6b0825a89febE40e04b965311
+    sha384: 5D5e55901B1CA2c0C026ed9628CB1E78E8C18213
+    sha512: ca49545C83caF06aD8BEd2800Fa2e39Bcab52842
 
 log:
   level: debug
@@ -44,4 +45,3 @@ cop:
 # Randomly generated key for testing purpose.
 keys:
   signature_key: "01077020101042022d0c137d5c1443b945b305963951c0dd20a03a710bf387f0"
-
