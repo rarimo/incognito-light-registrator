@@ -148,15 +148,21 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	command := fmt.Sprintf("bb verify -s ultra_honk -k ./verification_keys/registerIdentityLight%d.vk -p %s -v &> %s", alg, proofFile, cmdFile)
-	RunCommand(command)
-
-	content, err := os.ReadFile(cmdFile)
+	command := fmt.Sprintf("bb verify -s ultra_honk -k ./verification_keys/registerIdentityLight%d.vk -p %s -v", alg, proofFile)
+	out, outErr, err := RunCommand(command)
 	if err != nil {
-		log.WithError(err).Error("failed to write decoded base64")
-		jsonError = append(jsonError, problems.InternalError())
-		return
+		panic(err)
 	}
+
+	log.Info(out, " ", outErr)
+	content := outErr
+
+	// content, err := os.ReadFile(cmdFile)
+	// if err != nil {
+	// 	log.WithError(err).Error("failed to write decoded base64")
+	// 	jsonError = append(jsonError, problems.InternalError())
+	// 	return
+	// }
 	verified := false
 	if parts := strings.Split(string(content), "verified: "); len(parts) > 1 {
 		verified = strings.TrimSpace(parts[1]) == "1"

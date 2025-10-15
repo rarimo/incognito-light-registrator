@@ -6,7 +6,7 @@ build:
       docker:
         buildArgs:
           CI_JOB_TOKEN: "{{.CI_JOB_TOKEN}}"
-
+        platform: linux/amd64
 
 # Uncomment the following lines if you want to deploy your application
 # profiles:
