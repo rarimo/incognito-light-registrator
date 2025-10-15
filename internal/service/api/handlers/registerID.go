@@ -63,7 +63,6 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 	verifierCfg := api.VerifierConfig(r)
 	folderPath := verifierCfg.TmpFilePath
 	proofFile := fmt.Sprintf("%sproof%s", folderPath, requestID)
-	cmdFile := fmt.Sprintf("%scmd%s.txt", folderPath, requestID)
 
 	var response *resources.SignatureResponse
 	var jsonError []*jsonapi.ErrorObject
@@ -108,9 +107,6 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 		if err := os.Remove(proofFile); err != nil && !os.IsNotExist(err) {
 			log.WithError(err).Errorf("failed to remove file %s", proofFile)
 		}
-		if err := os.Remove(cmdFile); err != nil && !os.IsNotExist(err) {
-			log.WithError(err).Errorf("failed to remove file %s", cmdFile)
-		}
 
 		if jsonError != nil {
 			ape.RenderErr(w, jsonError...)
@@ -148,15 +144,18 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	command := fmt.Sprintf("bb verify -s ultra_honk -k ./verification_keys/registerIdentityLight%d.vk -p %s -v &> %s", alg, proofFile, cmdFile)
-	RunCommand(command)
-
-	content, err := os.ReadFile(cmdFile)
+	command := fmt.Sprintf("bb verify -s ultra_honk -k ./verification_keys/registerIdentityLight%d.vk -p %s -v", alg, proofFile)
+	out, outErr, err := RunCommand(command)
 	if err != nil {
-		log.WithError(err).Error("failed to write decoded base64")
-		jsonError = append(jsonError, problems.InternalError())
+		log.WithError(err).Error("failed to verify proof using bb")
+		jsonError = append(jsonError, problems.BadRequest(validation.Errors{
+			"zk_proof": errors.New("proof verifying failed"),
+		})...)
 		return
 	}
+
+	content := out + outErr
+
 	verified := false
 	if parts := strings.Split(string(content), "verified: "); len(parts) > 1 {
 		verified = strings.TrimSpace(parts[1]) == "1"

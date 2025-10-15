@@ -30,7 +30,7 @@ log:
   disable_sentry: true
 
 db:
-  url: postgres://ilr:ilr@localhost:5432/ilr?sslmode=disable
+  url: postgres://ilr:ilr@my_postgres:5432/ilr?sslmode=disable
 
 listener:
   addr: :8000
