@@ -1,12 +1,15 @@
 apiVersion: skaffold/v2beta28
 kind: Config
 build:
+  local:
+    useDockerCLI: true
   artifacts:
     - image: incognito-light-registrator # Change it on your own repo-name
       docker:
         buildArgs:
           CI_JOB_TOKEN: "{{.CI_JOB_TOKEN}}"
-        platform: linux/amd64
+        cliFlags:
+          - --platform=linux/amd64
 
 # Uncomment the following lines if you want to deploy your application
 # profiles:
