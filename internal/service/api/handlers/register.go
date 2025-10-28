@@ -157,11 +157,14 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
     dg1Truncated := utils.TruncateDg1Hash(dg1Hash)
     if !bytes.Equal(dg1Truncated[:], proofDg1Decimal.FillBytes(make([]byte, 32))) {
-        log.Error("proof contains foreign data group 1")
-        jsonError = problems.BadRequest(validation.Errors{
-            "zk_proof": errors.New("proof contains foreign data group 1"),
-        })
-        return
+        log.WithFields(logan.F{
+			"dg1Truncated":    hex.EncodeToString(dg1Truncated[:]),
+			"proofDg1Decimal": hex.EncodeToString(proofDg1Decimal.FillBytes(make([]byte, 32))),
+		}).Error("proof contains foreign data group 1")
+		jsonError = problems.BadRequest(validation.Errors{
+			"zk_proof": errors.New("proof contains foreign data group 1"),
+		})
+		return
     }
 
 	verifierContract, ok := addressesCfg.Verifiers[algorithmPair.DgHashAlgorithm]
