@@ -21,6 +21,7 @@ RUN apk add --no-cache libc++ libgcc curl
 COPY --from=buildbase /usr/local/bin/incognito-light-registrator /usr/local/bin/incognito-light-registrator
 COPY --from=buildbase /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=buildbase /go/src/github.com/rarimo/incognito-light-registrator/verification_keys/* /verification_keys/
+COPY --from=buildbase /go/src/github.com/rarimo/incognito-light-registrator/contract_artifacts/* /contract_artifacts/
 COPY --from=buildbase /go/src/github.com/rarimo/incognito-light-registrator/masterList.dev.pem /masterList.dev.pem
 
 ENTRYPOINT ["incognito-light-registrator"]

@@ -5,7 +5,13 @@ verifier:
     sha256: "./verification_keys/registerIdentityLight256.json"
     sha384: "./verification_keys/registerIdentityLight384.json"
     sha512: "./verification_keys/registerIdentityLight512.json"
-  master_certs_path: "./masterList.dev.pem"
+  contract_artifacts_paths:
+    sha1: "./contract_artifacts/bin160.hex"
+    sha224: "./contract_artifacts/bin224.hex"
+    sha256: "./contract_artifacts/bin256.hex"
+    sha384: "./contract_artifacts/bin384.hex"
+    sha512: "./contract_artifacts/bin512.hex"
+  master_certs_path: "/masterList.dev.pem"
   disableTimeChecks: false
   disableNameChecks: false
   tmpFilePath: "tmp/"
