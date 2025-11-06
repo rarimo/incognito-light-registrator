@@ -2,22 +2,29 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"net/http"
-	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core"
+	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/google/jsonapi"
-	"github.com/google/uuid"
 	"github.com/rarimo/passport-identity-provider/internal/data"
 	"github.com/rarimo/passport-identity-provider/internal/types"
 	"github.com/rarimo/passport-identity-provider/internal/utils"
@@ -33,7 +40,6 @@ import (
 
 func RegisterID(w http.ResponseWriter, r *http.Request) {
 	log := api.Log(r)
-	requestID := uuid.New().String()
 
 	req, err := requests.NewRegisterIDRequest(r)
 	if err != nil {
@@ -61,8 +67,6 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 		PemFile:             req.Data.Attributes.DocumentSod.PemFile,
 	}
 	verifierCfg := api.VerifierConfig(r)
-	folderPath := verifierCfg.TmpFilePath
-	proofFile := fmt.Sprintf("%sproof%s", folderPath, requestID)
 
 	var response *resources.SignatureResponse
 	var jsonError []*jsonapi.ErrorObject
@@ -104,10 +108,6 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 			ape.Render(w, response)
 		}
 
-		if err := os.Remove(proofFile); err != nil && !os.IsNotExist(err) {
-			log.WithError(err).Errorf("failed to remove file %s", proofFile)
-		}
-
 		if jsonError != nil {
 			ape.RenderErr(w, jsonError...)
 			return
@@ -129,52 +129,24 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	decoded, decodingErr := base64.StdEncoding.DecodeString(req.Data.Attributes.ZkProof)
-	if decodingErr != nil {
-		log.WithError(err).Error("failed to decode base64")
-		jsonError = append(jsonError, problems.BadRequest(validation.Errors{
-			"zk_proof": errors.New("proof decoding failed"),
-		})...)
-		return
-	}
-	writingError := os.WriteFile(proofFile, decoded, 0644)
-	if writingError != nil {
-		log.WithError(writingError).Error("failed to write decoded base64")
-		jsonError = append(jsonError, problems.InternalError())
-		return
-	}
-
-	command := fmt.Sprintf("bb verify -s ultra_honk -k ./verification_keys/registerIdentityLight%d.vk -p %s -v", alg, proofFile)
-	out, outErr, err := RunCommand(command)
-	if err != nil {
-		log.WithError(err).Error("failed to verify proof using bb")
-		jsonError = append(jsonError, problems.BadRequest(validation.Errors{
-			"zk_proof": errors.New("proof verifying failed"),
-		})...)
-		return
-	}
-
-	content := out + outErr
-
-	verified := false
-	if parts := strings.Split(string(content), "verified: "); len(parts) > 1 {
-		verified = strings.TrimSpace(parts[1]) == "1"
-	}
-
-	if !verified {
-		log.WithError(err).Error(string(content))
-		jsonError = append(jsonError, problems.BadRequest(validation.Errors{
-			"zk_proof": errors.New("invalid proof"),
-		})...)
-		return
-	}
-
 	hexProof, err := base64.StdEncoding.DecodeString(req.Data.Attributes.ZkProof)
 	if err != nil {
 		log.WithError(err).Error("failed to decode base64")
 		jsonError = problems.BadRequest(validation.Errors{
 			"zk_proof": err,
 		})
+		return
+	}
+	contractABI, contractBin, err := GetContractArtifacts(alg)
+	if err != nil {
+		log.WithError(err).Error("failed to get contract artifacts")
+		jsonError = append(jsonError, problems.InternalError())
+		return
+	}
+
+	proofErr := VerifyProof(contractABI, contractBin, hex.EncodeToString(hexProof), log)
+	if proofErr != nil {
+		jsonError = proofErr
 		return
 	}
 
@@ -267,4 +239,131 @@ func RunCommand(command string) (string, string, error) {
 	err := cmd.Run()
 
 	return stdoutBuf.String(), stderrBuf.String(), err
+}
+
+func GetContractArtifacts(algo int) (string, string, error) {
+	abi := `[{"inputs":[],"name":"INVALID_VERIFICATION_KEY","type":"error"},{"inputs":[],"name":"MOD_EXP_FAILURE","type":"error"},{"inputs":[],"name":"OPENING_COMMITMENT_FAILED","type":"error"},{"inputs":[],"name":"PAIRING_FAILED","type":"error"},{"inputs":[],"name":"PAIRING_PREAMBLE_FAILED","type":"error"},{"inputs":[],"name":"POINT_NOT_ON_CURVE","type":"error"},{"inputs":[{"internalType":"uint256","name":"expected","type":"uint256"},{"internalType":"uint256","name":"actual","type":"uint256"}],"name":"PUBLIC_INPUT_COUNT_INVALID","type":"error"},{"inputs":[],"name":"PUBLIC_INPUT_GE_P","type":"error"},{"inputs":[],"name":"PUBLIC_INPUT_INVALID_BN128_G1_POINT","type":"error"},{"inputs":[],"name":"getVerificationKeyHash","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"pure","type":"function"},{"inputs":[{"internalType":"bytes","name":"_proof","type":"bytes"},{"internalType":"bytes32[]","name":"_publicInputs","type":"bytes32[]"}],"name":"verify","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"}]`
+	filename := "./contract_artifacts/bin" + strconv.Itoa(algo) + ".hex"
+	bin, err := readHexFile(filename)
+	if err != nil {
+		return "", "", err
+	}
+	return abi, bin, nil
+}
+
+func VerifyProof(contractABI string, contractBin string, proofHex string, log *logan.Entry) []*jsonapi.ErrorObject {
+	var jsonError []*jsonapi.ErrorObject
+
+	privateKey, err := crypto.GenerateKey()
+	if err != nil {
+		log.WithError(err).Error("failed to simulate contract execution: GenerateKey")
+		jsonError = append(jsonError, problems.InternalError())
+		return jsonError
+	}
+	auth, err := bind.NewKeyedTransactorWithChainID(privateKey, big.NewInt(1337))
+	if err != nil {
+		log.WithError(err).Error("failed to simulate contract execution: NewKeyedTransactorWithChainID")
+		jsonError = append(jsonError, problems.InternalError())
+		return jsonError
+	}
+
+	alloc := map[common.Address]core.GenesisAccount{
+		auth.From: {Balance: big.NewInt(1000000000000000000)}, // 1 ETH
+	}
+	client := backends.NewSimulatedBackend(alloc, 8000000)
+	parsedABI, err := abi.JSON(strings.NewReader(contractABI))
+	if err != nil {
+		log.WithError(err).Error("failed to simulate contract execution: parsedABI")
+		jsonError = append(jsonError, problems.InternalError())
+		return jsonError
+	}
+
+	nonce, err := client.PendingNonceAt(context.Background(), auth.From)
+	if err != nil {
+		log.WithError(err).Error("failed to simulate contract execution: nonce")
+		jsonError = append(jsonError, problems.InternalError())
+		return jsonError
+	}
+	gasPrice, err := client.SuggestGasPrice(context.Background())
+	if err != nil {
+		log.WithError(err).Error("failed to simulate contract execution: SuggestGasPrice")
+		jsonError = append(jsonError, problems.InternalError())
+		return jsonError
+	}
+	gasLimit := uint64(3000000)
+	tx := ethTypes.NewContractCreation(nonce, big.NewInt(0), gasLimit, gasPrice, common.FromHex(contractBin))
+	signedTx, err := ethTypes.SignTx(tx, ethTypes.LatestSignerForChainID(big.NewInt(1337)), privateKey)
+	if err != nil {
+		log.WithError(err).Error("failed to simulate contract execution: signedTx")
+		jsonError = append(jsonError, problems.InternalError())
+		return jsonError
+	}
+	err = client.SendTransaction(context.Background(), signedTx)
+	if err != nil {
+		log.WithError(err).Error("failed to simulate contract execution: SendTransaction")
+		jsonError = append(jsonError, problems.InternalError())
+		return jsonError
+	}
+	client.Commit()
+
+	receipt, err := client.TransactionReceipt(context.Background(), signedTx.Hash())
+	if err != nil {
+		log.WithError(err).Error("failed to simulate contract execution: TransactionReceipt")
+		jsonError = append(jsonError, problems.InternalError())
+		return jsonError
+	}
+
+	contractAddress := receipt.ContractAddress
+
+	caller := bind.NewBoundContract(contractAddress, parsedABI, client, client, client)
+
+	proofBytes, err := hex.DecodeString(proofHex)
+	if err != nil {
+		log.WithError(err).Error("failed to decode proof hex")
+		jsonError = problems.BadRequest(validation.Errors{
+			"zk_proof": err,
+		})
+		return jsonError
+	}
+	var publicInputs [3][32]byte
+
+	for i := 0; i < 3; i++ {
+		start := i * 32
+		end := start + 32
+		copy(publicInputs[i][:], proofBytes[start:end])
+	}
+	proofBytes = proofBytes[96:]
+
+	results := make([]interface{}, 1)
+	var ret bool
+	results[0] = &ret
+
+	err = caller.Call(nil, &results, "verify", proofBytes, publicInputs)
+	if err != nil {
+		log.WithError(err).Error("failed to simulate contract execution: Call")
+		jsonError = problems.BadRequest(validation.Errors{
+			"zk_proof": err,
+		})
+		return jsonError
+	}
+
+	if ret {
+		log.Info("Valid proof provided")
+		return nil
+	}
+	log.Error("invalid zk proof")
+	jsonError = problems.BadRequest(validation.Errors{
+		"zk_proof": fmt.Errorf("Invalid zk proof"),
+	})
+	return jsonError
+}
+
+func readHexFile(filename string) (string, error) {
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return "", err
+	}
+
+	cleanStr := strings.TrimSpace(string(data))
+	return cleanStr, nil
 }

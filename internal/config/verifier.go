@@ -2,7 +2,6 @@ package config
 
 import (
 	"os"
-	"strings"
 
 	"github.com/rarimo/certificate-transparency-go/x509"
 	"github.com/rarimo/passport-identity-provider/internal/types"
@@ -17,10 +16,10 @@ type VerifierConfiger interface {
 
 type VerifierConfig struct {
 	VerificationKeys  map[types.HashAlgorithm][]byte
+	ContractArtifacts map[types.HashAlgorithm][]byte
 	MasterCerts       *x509.CertPool
 	DisableTimeChecks bool
 	DisableNameChecks bool
-	TmpFilePath       string
 }
 
 type verifier struct {
@@ -37,11 +36,11 @@ func NewVerifierConfiger(getter kv.Getter) VerifierConfiger {
 func (v *verifier) VerifierConfig() *VerifierConfig {
 	return v.once.Do(func() interface{} {
 		newCfg := struct {
-			VerificationKeysPaths map[string]string `fig:"verification_keys_paths,required"`
-			MasterCertsPath       string            `fig:"master_certs_path,required"`
-			DisableTimeChecks     bool              `fig:"disable_time_checks"`
-			DisableNameChecks     bool              `fig:"disable_name_checks"`
-			TmpFilePath           string            `fig:"tmpfilepath"`
+			VerificationKeysPaths  map[string]string `fig:"verification_keys_paths,required"`
+			ContractArtifactsPaths map[string]string `fig:"contract_artifacts_paths,required"`
+			MasterCertsPath        string            `fig:"master_certs_path,required"`
+			DisableTimeChecks      bool              `fig:"disable_time_checks"`
+			DisableNameChecks      bool              `fig:"disable_name_checks"`
 		}{}
 
 		err := figure.
@@ -63,6 +62,16 @@ func (v *verifier) VerifierConfig() *VerifierConfig {
 			verificationKeys[types.HashAlgorithmFromString(algo)] = verificationKey
 		}
 
+		contractArtifacts := make(map[types.HashAlgorithm][]byte)
+		for algo, path := range newCfg.ContractArtifactsPaths {
+			artifact, err := os.ReadFile(path)
+			if err != nil {
+				panic(err)
+			}
+
+			contractArtifacts[types.HashAlgorithmFromString(algo)] = artifact
+		}
+
 		masterCerts, err := os.ReadFile(newCfg.MasterCertsPath)
 		if err != nil {
 			panic(err)
@@ -71,17 +80,12 @@ func (v *verifier) VerifierConfig() *VerifierConfig {
 		roots := x509.NewCertPool()
 		roots.AppendCertsFromPEM(masterCerts)
 
-		tmpPath := newCfg.TmpFilePath
-		if !strings.HasSuffix(tmpPath, "/") {
-			tmpPath = tmpPath + "/"
-		}
-
 		return &VerifierConfig{
 			VerificationKeys:  verificationKeys,
+			ContractArtifacts: contractArtifacts,
 			MasterCerts:       roots,
 			DisableTimeChecks: newCfg.DisableTimeChecks,
 			DisableNameChecks: newCfg.DisableNameChecks,
-			TmpFilePath:       tmpPath,
 		}
 	}).(*VerifierConfig)
 }
