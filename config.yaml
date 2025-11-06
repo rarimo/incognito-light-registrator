@@ -14,7 +14,6 @@ verifier:
   master_certs_path: "/masterList.dev.pem"
   disableTimeChecks: false
   disableNameChecks: false
-  tmpFilePath: "tmp/"
 
 addresses:
   registration_contract: a2e2Cbbd0BAa74FE1bb4b61B12D420072806FFe0

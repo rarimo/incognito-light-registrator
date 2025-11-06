@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"math/big"
 	"net/http"
-	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
@@ -26,7 +25,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/google/jsonapi"
-	"github.com/google/uuid"
 	"github.com/rarimo/passport-identity-provider/internal/data"
 	"github.com/rarimo/passport-identity-provider/internal/types"
 	"github.com/rarimo/passport-identity-provider/internal/utils"
@@ -42,7 +40,6 @@ import (
 
 func RegisterID(w http.ResponseWriter, r *http.Request) {
 	log := api.Log(r)
-	requestID := uuid.New().String()
 
 	req, err := requests.NewRegisterIDRequest(r)
 	if err != nil {
@@ -70,8 +67,6 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 		PemFile:             req.Data.Attributes.DocumentSod.PemFile,
 	}
 	verifierCfg := api.VerifierConfig(r)
-	folderPath := verifierCfg.TmpFilePath
-	proofFile := fmt.Sprintf("%sproof%s", folderPath, requestID)
 
 	var response *resources.SignatureResponse
 	var jsonError []*jsonapi.ErrorObject
@@ -111,10 +106,6 @@ func RegisterID(w http.ResponseWriter, r *http.Request) {
 
 		if response != nil {
 			ape.Render(w, response)
-		}
-
-		if err := os.Remove(proofFile); err != nil && !os.IsNotExist(err) {
-			log.WithError(err).Errorf("failed to remove file %s", proofFile)
 		}
 
 		if jsonError != nil {
@@ -343,8 +334,7 @@ func VerifyProof(contractABI string, contractBin string, proofHex string, log *l
 	}
 	proofBytes = proofBytes[96:]
 
-	var results []interface{}
-	results = make([]interface{}, 1)
+	results := make([]interface{}, 1)
 	var ret bool
 	results[0] = &ret
 
